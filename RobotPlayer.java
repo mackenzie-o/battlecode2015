@@ -2,14 +2,20 @@ package tehnummurone;
 
 import battlecode.common.*;
 import java.util.*;
+import java.lang.Math;
 
 public class RobotPlayer {
 	static RobotController rc;
 	static Team myTeam;
+	static MapLocation myHQ;
+	static MapLocation enemyHQ;
 	static Team enemyTeam;
+	static MapLocation rally;
 	static int myRange;
+	static Direction myDirection;
 	static Random rand;
 	static RobotInfo[] myRobots;
+	static boolean attack;
 	static Direction[] directions = {Direction.NORTH, Direction.NORTH_EAST, Direction.EAST, 
 										Direction.SOUTH_EAST, Direction.SOUTH, Direction.SOUTH_WEST, 
 										Direction.WEST, Direction.NORTH_WEST};
@@ -18,20 +24,19 @@ public class RobotPlayer {
 		rc = tomatojuice;
         rand = new Random(rc.getID());
 
+		attack = false;
 		myRange = rc.getType().attackRadiusSquared;
 		MapLocation enemyLoc = rc.senseEnemyHQLocation();
         Direction lastDirection = null;
 		myTeam = rc.getTeam();
 		enemyTeam = myTeam.opponent();
+		myHQ = rc.senseHQLocation();
+		enemyHQ = rc.senseEnemyHQLocation();
+		rally = getRally();
+		rc.setIndicatorString(0, "I am a " + rc.getType());
 
 		while(true) {
-            try {
-                rc.setIndicatorString(0, "I am a " + rc.getType());
-				rc.setIndicatorString(1, "");
-            } catch (Exception e) {
-                System.out.println("Unexpected exception");
-                e.printStackTrace();
-            }
+			rc.setIndicatorString(1, "");
 			
 			if (rc.getType() == RobotType.HQ) {
 				try {		
@@ -74,8 +79,10 @@ public class RobotPlayer {
 					barracks();
 				} catch (Exception e) {
 					System.out.println("Barracks Exception");
-                    e.printStackTrace();
+					e.printStackTrace();
 				}
+			}else if (rc.getType() == RobotType.SUPPLYDEPOT){
+				//do nothing
 			} else {
 				System.out.println("... I don't know... help");
 			}
@@ -91,6 +98,7 @@ public class RobotPlayer {
 		int numBashers = 0;
 		int numBeavers = 0;
 		int numBarracks = 0;
+		int numSupplyDepots = 0;
 		for (RobotInfo r : myRobots) {
 			RobotType type = r.type;
 			if (type == RobotType.SOLDIER) {
@@ -101,19 +109,26 @@ public class RobotPlayer {
 				numBeavers++;
 			} else if (type == RobotType.BARRACKS) {
 				numBarracks++;
+			} else if (type == RobotType.SUPPLYDEPOT){
+				numSupplyDepots++;
 			}
 		}
 		rc.broadcast(0, numBeavers);
 		rc.broadcast(1, numSoldiers);
 		rc.broadcast(2, numBashers);
+		rc.broadcast(99, numSupplyDepots);
 		rc.broadcast(100, numBarracks);
+		
+		MapLocation closestTower = findClosestEnemyTower();
+		rc.broadcast(50, closestTower.x);
+		rc.broadcast(51, closestTower.y);
 
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
 
-		if (rc.isCoreReady() && rc.getTeamOre() >= 100 && fate < Math.pow(1.2,12-numBeavers)*10000) {
-			trySpawn(rc.getLocation().directionTo(rc.senseEnemyHQLocation()), RobotType.BEAVER);
+		if (rc.isCoreReady() && rc.getTeamOre() >= 100 && numBeavers<30 && fate < Math.pow(1.2,12-numBeavers)*10000) {
+			trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.BEAVER);
 		}
 	}
 	
@@ -125,10 +140,10 @@ public class RobotPlayer {
 	
 	static void basher() throws GameActionException {
 		RobotInfo[] adjacentEnemies = rc.senseNearbyRobots(2, enemyTeam);
-
+		
 		// BASHERs attack automatically, so let's just move around mostly randomly
 		if (rc.isCoreReady()) {
-			tryMove(rc.getLocation().directionTo(rc.senseEnemyHQLocation()));
+			moveToRally();
 		}
 	}
 	
@@ -136,9 +151,10 @@ public class RobotPlayer {
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
-		if (rc.isCoreReady()) {
-			tryMove(rc.getLocation().directionTo(rc.senseEnemyHQLocation()));
+		if (rc.isCoreReady()){
+			moveToRally();
 		}
+
 	}
 	
 	static void beaver() throws GameActionException {
@@ -146,13 +162,28 @@ public class RobotPlayer {
 			attackSomething();
 		}
 		if (rc.isCoreReady()) {
-			if (rc.getTeamOre() >= 400) {
+			if (rc.getTeamOre() >= 400 && rc.readBroadcast(100)<2) {
 				tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
+			} else if (rc.getTeamOre() >= 100 && rc.readBroadcast(99)<3){
+				tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
+			} else if (distanceBetween(rc.getLocation(), myHQ) < 4) {
+				if(myDirection == null) {
+					int fate = rand.nextInt(30);
+					if (fate < 10) {
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateLeft().rotateLeft();
+					} else if (fate < 20) {
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateRight().rotateRight();
+					} else {
+						myDirection=rc.getLocation().directionTo(enemyHQ).opposite();
+					}
+				}
+				tryMove(myDirection);
 			} else if (rc.senseOre(rc.getLocation()) > 0) {
 				rc.mine();
-			} else {
-				tryMove(findCowardlyMove());
+			} else { //run awwayy!
+				tryMove(rc.getLocation().directionTo(myHQ).opposite());
 			}
+			//TODO: search for ore
 		}
 	}
 	
@@ -164,12 +195,12 @@ public class RobotPlayer {
 		int numSoldiers = rc.readBroadcast(1);
 		int numBashers = rc.readBroadcast(2);
 
-		if (rc.isCoreReady() && rc.getTeamOre() >= 60 && fate < Math.pow(1.2,15-numSoldiers-numBashers+numBeavers)*10000) {
-			if (rc.getTeamOre() > 80 && fate % 2 == 0) {
-				trySpawn(rc.getLocation().directionTo(rc.senseEnemyHQLocation()),RobotType.BASHER);
-			} else {
-				trySpawn(rc.getLocation().directionTo(rc.senseEnemyHQLocation()),RobotType.SOLDIER);
-			}
+		if (rc.isCoreReady() && rc.getTeamOre() >= 80 && fate < Math.pow(1.2,15-numSoldiers-numBashers+numBeavers)*10000) {
+			//if (rc.getTeamOre() > 80 && fate % 2 == 0) {
+				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.BASHER);
+//			} else {
+//				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
+//			}
 		}
 	}
 	
@@ -182,9 +213,9 @@ public class RobotPlayer {
 		}
 	}
     // This method will attempt to move in Direction d (or as close to it as possible)
-	static void tryMove(Direction d) throws GameActionException {
+	static boolean tryMove(Direction d) throws GameActionException {
 		int offsetIndex = 0;
-		int[] offsets = {0, 1, -1, 2, -2};
+		int[] offsets = {0,1,-1,2,-2};
 		int dirint = directionToInt(d);
 		boolean blocked = false;
 		while (offsetIndex < 5 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
@@ -192,8 +223,10 @@ public class RobotPlayer {
 		}
 		if (offsetIndex < 5) {
 			rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+			return true;
 		} else {
 			rc.setIndicatorString(1, "I am stuck");
+			return false;
 		}
 	}
     // This method will attempt to spawn in the given direction (or as close to it as possible)
@@ -246,28 +279,47 @@ public class RobotPlayer {
 				return -1;
 		}
 	}
+
+	static int distanceBetween(MapLocation a, MapLocation b){
+		return (int) Math.sqrt((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y));
+	}
 	
-	static Direction findCowardlyMove(){
-		switch(rc.getLocation().directionTo(rc.senseEnemyHQLocation())) {
-			case NORTH:
-				return Direction.SOUTH;
-			case NORTH_EAST:
-				return Direction.SOUTH_WEST;
-			case EAST:
-				return Direction.WEST;
-			case SOUTH_EAST:
-				return Direction.NORTH_WEST;
-			case SOUTH:
-				return Direction.NORTH;
-			case SOUTH_WEST:
-				return Direction.NORTH_EAST;
-			case WEST:
-				return Direction.EAST;
-			case NORTH_WEST:
-				return Direction.SOUTH_EAST;
-			default:
-				return Direction.NORTH;
+	static void moveToRally() throws GameActionException{
+		int distanceToGoal = distanceBetween(rc.getLocation(), rally);
+		if(attack || (distanceToGoal < 10 && Clock.getRoundNum()%250<10)){
+			rally = new MapLocation(rc.readBroadcast(50), rc.readBroadcast(51));
+			attack = true;
+			//TODO: should eventually go for nearest tower
 		}
+			
+		if(distanceToGoal > 2)
+			tryMove(rc.getLocation().directionTo(rally));
+		else
+			rc.setIndicatorString(1, "waiting...");
+		//TODO: while waiting, find nearish enemies and KILL THEM
+	}
+	
+	static MapLocation getRally(){
+		return new MapLocation((enemyHQ.x + myHQ.x)/2,
+				(enemyHQ.y + myHQ.y)/2);
+		
+	}
+	
+	static MapLocation findClosestEnemyTower(){
+		MapLocation[] towers = rc.senseEnemyTowerLocations();
+		MapLocation closest = enemyHQ;
+		int min_distance = distanceBetween(rally, enemyHQ);
+		int cur;
+		
+		for(int i=0; i<towers.length; i++){
+			cur = distanceBetween(rally, towers[i]);
+			if(cur<min_distance){
+				closest = towers[i];
+				min_distance = cur;
+			}
+		}
+		return closest;
+		
 		
 	}
 }
