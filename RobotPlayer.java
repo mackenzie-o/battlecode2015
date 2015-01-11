@@ -1,6 +1,8 @@
 package tehnummurone;
 
 import battlecode.common.*;
+
+import java.lang.Exception;
 import java.util.*;
 import java.lang.Math;
 
@@ -16,6 +18,8 @@ public class RobotPlayer {
 	static Random rand;
 	static RobotInfo[] myRobots;
 	static boolean attack;
+	static boolean followEdge;
+	static int[][] surrounding;
 	static Direction[] directions = {Direction.NORTH, Direction.NORTH_EAST, Direction.EAST, 
 										Direction.SOUTH_EAST, Direction.SOUTH, Direction.SOUTH_WEST, 
 										Direction.WEST, Direction.NORTH_WEST};
@@ -23,7 +27,8 @@ public class RobotPlayer {
 	public static void run(RobotController tomatojuice) {
 		rc = tomatojuice;
         rand = new Random(rc.getID());
-
+		
+		followEdge = false;
 		attack = false;
 		myRange = rc.getType().attackRadiusSquared;
 		MapLocation enemyLoc = rc.senseEnemyHQLocation();
@@ -34,6 +39,7 @@ public class RobotPlayer {
 		enemyHQ = rc.senseEnemyHQLocation();
 		rally = getRally();
 		rc.setIndicatorString(0, "I am a " + rc.getType());
+		surrounding = new int[3][3];
 
 		while(true) {
 			rc.setIndicatorString(1, "");
@@ -215,13 +221,14 @@ public class RobotPlayer {
     // This method will attempt to move in Direction d (or as close to it as possible)
 	static boolean tryMove(Direction d) throws GameActionException {
 		int offsetIndex = 0;
-		int[] offsets = {0,1,-1,2,-2};
+		int[] offsets = {0,1,-1,2,-2,3,-3,4};
 		int dirint = directionToInt(d);
 		boolean blocked = false;
-		while (offsetIndex < 5 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
+		while (offsetIndex < 8 && !checkCanMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
 			offsetIndex++;
 		}
-		if (offsetIndex < 5) {
+		if (offsetIndex < 8) {
+			mapMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
 			rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
 			return true;
 		} else {
@@ -229,6 +236,35 @@ public class RobotPlayer {
 			return false;
 		}
 	}
+	
+	static boolean bugMove(MapLocation m) throws GameActionException {
+		MapLocation cur = rc.getLocation();
+		Direction optimal = cur.directionTo(m);
+		
+		if (checkCanMove(optimal)){
+			rc.move(optimal);
+		} else if (hasNeighboringNull(rc.getLocation())){
+			MapLocation edge = followSimpleEdge(rc.getLocation(), getNeighboringNull(rc.getLocation()), optimal);
+			if(edge == rc.getLocation()){
+				edge = followHardEdge(rc.getLocation(), optimal);
+			}
+			Direction move = rc.getLocation().directionTo(edge);
+			if(edge!=rc.getLocation() && rc.canMove(move)){
+				mapMove(move);
+				rc.move(move);
+			} else{
+				if(edge == rc.getLocation())
+					rc.setIndicatorString(1, "couldn't find an edge");
+				else if (!rc.canMove(move))
+					rc.setIndicatorString(1, "couldn't move in direction "+ directionToInt(move));
+				else rc.setIndicatorString(1, "don't know what to tell you man");
+			}
+		} else {
+			tryMove(optimal);
+		}
+		return true;
+	}
+	
     // This method will attempt to spawn in the given direction (or as close to it as possible)
 	static void trySpawn(Direction d, RobotType type) throws GameActionException {
 		int offsetIndex = 0;
@@ -293,7 +329,7 @@ public class RobotPlayer {
 		}
 			
 		if(distanceToGoal > 2)
-			tryMove(rc.getLocation().directionTo(rally));
+			bugMove(rally);
 		else
 			rc.setIndicatorString(1, "waiting...");
 		//TODO: while waiting, find nearish enemies and KILL THEM
@@ -321,5 +357,152 @@ public class RobotPlayer {
 		return closest;
 		
 		
+	}
+	
+	static void mapMove(Direction move){
+		surrounding = new int[3][3];
+		switch(move.opposite()) {
+			case NORTH:
+				surrounding[0][1] = 1;
+				break;
+			case NORTH_EAST:
+				surrounding[0][2] = 1;
+				break;
+			case EAST:
+				surrounding[1][2] = 1;
+				break;
+			case SOUTH_EAST:
+				surrounding[2][2] = 1;
+				break;
+			case SOUTH:
+				surrounding[2][1] = 1;
+				break;
+			case SOUTH_WEST:
+				surrounding[2][0] = 1;
+				break;
+			case WEST:
+				surrounding[1][0] = 1;
+				break;
+			case NORTH_WEST:
+				surrounding[0][0] = 1;
+				break;
+		}
+	}
+	
+	static boolean checkCanMove(Direction d){
+		return rc.canMove(d) && !wasThereBefore(d);
+	}
+	
+	static boolean wasThereBefore(Direction move){
+		int result = -1;
+		switch(move) {
+			case NORTH:
+				result = surrounding[0][1];
+				break;
+			case NORTH_EAST:
+				result = surrounding[0][2];
+				break;
+			case EAST:
+				result = surrounding[1][2];
+				break;
+			case SOUTH_EAST:
+				result = surrounding[2][2];
+				break;
+			case SOUTH:
+				result = surrounding[2][1];
+				break;
+			case SOUTH_WEST:
+				result = surrounding[2][0];
+				break;
+			case WEST:
+				result = surrounding[1][0];
+				break;
+			case NORTH_WEST:
+				result = surrounding[0][0];
+				break;
+		}
+		return result == 1;
+	}
+	static MapLocation followSimpleEdge(MapLocation start, MapLocation wall, Direction prefered){
+		int offsetIndex = 0;
+		int[] offsets = {0, 1, -1, 2, -2, 3, -3, 4};
+		int dirint = directionToInt(prefered);
+		while (offsetIndex < 8 &&
+				(!wall.isAdjacentTo(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])) ||
+						!rc.senseTerrainTile(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])).isTraversable() ||
+						//!hasNeighboringNull(start.add(directions[(dirint+offsets[offsetIndex] + 8) % 8])) ||
+						wasThereBefore(directions[(dirint + offsets[offsetIndex] + 8) % 8])
+				)) {
+			offsetIndex++;
+		}
+		if (offsetIndex < 8)
+			return start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+		else return start;
+	}
+	
+	static MapLocation followHardEdge(MapLocation start, Direction prefered){
+		MapLocation[] nulls = getAllNeighboringNull(start);
+		int offsetIndex;
+		
+		int[] offsets = {0, 1, -1, 2, -2, 3, -3, 4};
+		int dirint = directionToInt(prefered);
+		for(int i=0; i<nulls.length; i++) {
+			offsetIndex = 0;
+			if (nulls[i] != null) {
+				while (offsetIndex < 8 &&
+						(!nulls[i].isAdjacentTo(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])) ||
+								!rc.senseTerrainTile(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])).isTraversable() ||
+								//!hasNeighboringNull(start.add(directions[(dirint+offsets[offsetIndex] + 8) % 8])) ||
+								wasThereBefore(directions[(dirint + offsets[offsetIndex] + 8) % 8]))) {
+					offsetIndex++;
+				}
+				if (offsetIndex < 8)
+					return start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+			}
+		}
+		return start;
+	}
+	
+	static boolean hasNeighboringNull(MapLocation target){
+		TerrainTile tile;
+		for(int i=0; i< directions.length; i++){
+			tile = rc.senseTerrainTile(target.add(directions[i]));
+			if(!tile.isTraversable()){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	static MapLocation getNeighboringNull(MapLocation target) {
+		int index = 0;
+		TerrainTile tile;
+		for (int i=0; i<directions.length; i++){
+			tile = rc.senseTerrainTile(target.add(directions[index]));
+			if(!tile.isTraversable()){
+				return target.add(directions[index]);
+			}
+			index = (index + 2);
+			if(index == 8) index = 1;
+		}
+		System.out.println("I should not be here!");
+		return null;
+	}
+
+	static MapLocation[] getAllNeighboringNull(MapLocation target) {
+		int index = 0;
+		int next = 0;
+		MapLocation[] results = new MapLocation[8];
+		TerrainTile tile;
+		for (int i=0; i<directions.length; i++){
+			tile = rc.senseTerrainTile(target.add(directions[index]));
+			if(!tile.isTraversable()){
+				results[next] = target.add(directions[index]);
+				next++;
+			}
+			index = (index + 2);
+			if(index == 8) index = 1;
+		}
+		return results;
 	}
 }
