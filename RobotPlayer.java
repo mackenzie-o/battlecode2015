@@ -1,4 +1,4 @@
-package tehnummurone;
+package team166;
 
 import battlecode.common.*;
 import java.util.*;
