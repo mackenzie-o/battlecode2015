@@ -15,6 +15,9 @@ public class RobotPlayer {
 	static MapLocation rally;
 	static int myRange;
 	static Direction myDirection;
+	static boolean clockwise;
+	static boolean bug;
+	static int howClose;
 	static Random rand;
 	static RobotInfo[] myRobots;
 	static boolean attack;
@@ -42,7 +45,7 @@ public class RobotPlayer {
 		surrounding = new int[3][3];
 
 		while(true) {
-			rc.setIndicatorString(1, "");
+			//rc.setIndicatorString(1, "");
 			
 			if (rc.getType() == RobotType.HQ) {
 				try {		
@@ -235,34 +238,6 @@ public class RobotPlayer {
 			rc.setIndicatorString(1, "I am stuck");
 			return false;
 		}
-	}
-	
-	static boolean bugMove(MapLocation m) throws GameActionException {
-		MapLocation cur = rc.getLocation();
-		Direction optimal = cur.directionTo(m);
-		
-		if (checkCanMove(optimal)){
-			rc.move(optimal);
-		} else if (hasNeighboringNull(rc.getLocation())){
-			MapLocation edge = followSimpleEdge(rc.getLocation(), getNeighboringNull(rc.getLocation()), optimal);
-			if(edge == rc.getLocation()){
-				edge = followHardEdge(rc.getLocation(), optimal);
-			}
-			Direction move = rc.getLocation().directionTo(edge);
-			if(edge!=rc.getLocation() && rc.canMove(move)){
-				mapMove(move);
-				rc.move(move);
-			} else{
-				if(edge == rc.getLocation())
-					rc.setIndicatorString(1, "couldn't find an edge");
-				else if (!rc.canMove(move))
-					rc.setIndicatorString(1, "couldn't move in direction "+ directionToInt(move));
-				else rc.setIndicatorString(1, "don't know what to tell you man");
-			}
-		} else {
-			tryMove(optimal);
-		}
-		return true;
 	}
 	
     // This method will attempt to spawn in the given direction (or as close to it as possible)
@@ -504,5 +479,65 @@ public class RobotPlayer {
 			if(index == 8) index = 1;
 		}
 		return results;
+	}
+
+	static boolean bugMove(MapLocation m) throws GameActionException {
+		MapLocation cur = rc.getLocation();
+		Direction optimal = cur.directionTo(m);
+		System.out.println("i'm trying to move");
+		if(rc.canMove(optimal)){
+			//I want to go to there
+			rc.move(optimal);
+		} else if (terrainTileIsNull(optimal)){
+			//bug
+			System.out.println("I found a wall");
+			if(myDirection == null){
+				System.out.println("finding direction");
+				if(distanceBetween(rc.getLocation().add(optimal.rotateLeft()), m)<distanceBetween(rc.getLocation().add(optimal.rotateRight()), m)){
+					myDirection = optimal.rotateRight();
+					clockwise = false;
+					rc.setIndicatorString(1, "turning counter-clockwise");
+					
+				}else{
+					myDirection = optimal.rotateLeft();
+					clockwise = true;
+					rc.setIndicatorString(1, "turning clockwise");
+				}
+			}
+			
+			while(terrainTileIsNull(myDirection)){
+				if(clockwise){
+					myDirection = myDirection.rotateRight();
+				} else {
+					myDirection = myDirection.rotateLeft();
+				}
+			}
+			
+			if (clockwise){
+				while(!terrainTileIsNull(myDirection.rotateRight())){
+					myDirection = myDirection.rotateRight();
+				}
+			} else {
+				while(!terrainTileIsNull(myDirection.rotateLeft())){
+					myDirection = myDirection.rotateLeft();
+				}
+			}
+			
+			if(rc.canMove(myDirection)){
+				rc.move(myDirection);
+			}else{
+				tryMove(myDirection);
+			}
+			
+		}else {
+			tryMove(optimal);
+		}
+		
+		return true;
+	}
+	
+	static boolean terrainTileIsNull(Direction dir){
+		System.out.println("check that tile");
+		return rc.senseTerrainTile(rc.getLocation().add(dir)).isTraversable();
 	}
 }
