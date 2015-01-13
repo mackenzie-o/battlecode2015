@@ -1,8 +1,6 @@
 package team166;
 
 import battlecode.common.*;
-
-import java.lang.Exception;
 import java.util.*;
 import java.lang.Math;
 
@@ -29,11 +27,10 @@ public class RobotPlayer {
 	public static void run(RobotController tomatojuice) {
 		rc = tomatojuice;
         rand = new Random(rc.getID());
-		
 		attack = false;
 		myRange = rc.getType().attackRadiusSquared;
 		MapLocation enemyLoc = rc.senseEnemyHQLocation();
-        Direction lastDirection = null;
+                Direction lastDirection = null;
 		myTeam = rc.getTeam();
 		enemyTeam = myTeam.opponent();
 		myHQ = rc.senseHQLocation();
@@ -77,6 +74,13 @@ public class RobotPlayer {
 					System.out.println("Soldier Exception");
 					e.printStackTrace();
                 }
+            } else if (rc.getType() == RobotType.TANK) {
+                try {
+					tank();
+                } catch (Exception e) {
+					System.out.println("Tank Exception");
+					e.printStackTrace();
+                }
             } else if (rc.getType() == RobotType.BEAVER) {
 				try {
 					beaver();
@@ -93,6 +97,13 @@ public class RobotPlayer {
 				}
 			}else if (rc.getType() == RobotType.SUPPLYDEPOT){
 				//do nothing
+                        }else if (rc.getType() == RobotType.TANKFACTORY){
+				try {
+					tankFactory();
+				} catch (Exception e) {
+					System.out.println("Tank Factory Exception");
+					e.printStackTrace();
+				} 
 			} else {
 				System.out.println("... I don't know... help");
 			}
@@ -100,8 +111,27 @@ public class RobotPlayer {
 			rc.yield();
 		}
 	}
+        static void transferSupplies() throws GameActionException {
+            rc.setIndicatorString(1, "Transfering Supplies");
+            RobotInfo[] nearbyAllies = rc.senseNearbyRobots(rc.getLocation(), GameConstants.SUPPLY_TRANSFER_RADIUS_SQUARED, rc.getTeam());
+            double lowestSupply = rc.getSupplyLevel();
+            double transferAmount = 0;
+            MapLocation suppliesToThisLocation = null;
+            for (RobotInfo ri:nearbyAllies){
+                if (ri.supplyLevel < lowestSupply){
+                    lowestSupply = ri.supplyLevel;
+                    transferAmount = (rc.getSupplyLevel() - ri.supplyLevel)/2;
+                    suppliesToThisLocation = ri.location;
+                }
+            }
+            if(suppliesToThisLocation != null){
+                rc.transferSupplies((int)transferAmount, suppliesToThisLocation);
+            }
+        }  
+        
 	/*Robot Type Methods*/
 	static void hq() throws GameActionException {
+                transferSupplies();
 		int fate = rand.nextInt(10000);
 		myRobots = rc.senseNearbyRobots(999999, myTeam);
 		int numSoldiers = 0;
@@ -109,6 +139,8 @@ public class RobotPlayer {
 		int numBeavers = 0;
 		int numBarracks = 0;
 		int numSupplyDepots = 0;
+                int numTankFactories = 0;
+                int numTanks = 0;
 		for (RobotInfo r : myRobots) {
 			RobotType type = r.type;
 			if (type == RobotType.SOLDIER) {
@@ -121,13 +153,17 @@ public class RobotPlayer {
 				numBarracks++;
 			} else if (type == RobotType.SUPPLYDEPOT){
 				numSupplyDepots++;
+                        } else if (type == RobotType.TANKFACTORY){
+				numTankFactories++;
 			}
 		}
 		rc.broadcast(0, numBeavers);
 		rc.broadcast(1, numSoldiers);
 		rc.broadcast(2, numBashers);
+                rc.broadcast(3, numTanks); 
 		rc.broadcast(99, numSupplyDepots);
 		rc.broadcast(100, numBarracks);
+                rc.broadcast(101, numTankFactories);
 		
 		MapLocation closestTower = findClosestEnemyTower();
 		rc.broadcast(50, closestTower.x);
@@ -137,18 +173,20 @@ public class RobotPlayer {
 			attackSomething();
 		}
 
-		if (rc.isCoreReady() && rc.getTeamOre() >= 100 && numBeavers<30 && fate < Math.pow(1.2,12-numBeavers)*10000) {
+		if (rc.isCoreReady() && rc.getTeamOre() >= 100 && numBeavers<20 && fate < Math.pow(1.2,12-numBeavers)*10000) {
 			trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.BEAVER);
 		}
 	}
 	
 	static void tower() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
 	}
 	
 	static void basher() throws GameActionException {
+                transferSupplies();
 		RobotInfo[] adjacentEnemies = rc.senseNearbyRobots(2, enemyTeam);
 		
 		// BASHERs attack automatically, so let's just move around mostly randomly
@@ -158,6 +196,17 @@ public class RobotPlayer {
 	}
 	
 	static void soldier() throws GameActionException {
+                transferSupplies();
+		if (rc.isWeaponReady()) {
+			attackSomething();
+		}
+		if (rc.isCoreReady()){
+			moveToRally();
+		}
+
+	}
+        static void tank() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
@@ -168,29 +217,99 @@ public class RobotPlayer {
 	}
 	
 	static void beaver() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
 		if (rc.isCoreReady()) {
 			if (rc.getTeamOre() >= 400 && rc.readBroadcast(100)<2) {
 				tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
-			} else if (rc.getTeamOre() >= 100 && rc.readBroadcast(99)<3){
+			} else if (rc.getTeamOre() >= 100 && rc.readBroadcast(99)<1){ 
 				tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
-			} else if (distanceBetween(rc.getLocation(), myHQ) < 4) {
+                        } else if (rc.getTeamOre() >= 500 && rc.readBroadcast(100)>1 && rc.readBroadcast(101)<1 ){ 
+				tryBuild(rc.getLocation().directionTo(myHQ), RobotType.TANKFACTORY);
+                        }
+			 else if (distanceBetween(rc.getLocation(), myHQ) < 4) { 
+                             
 				if(myDirection == null) {
-					int fate = rand.nextInt(30);
+					int fate = rand.nextInt(80);
 					if (fate < 10) {
-						myDirection=rc.getLocation().directionTo(enemyHQ).rotateLeft().rotateLeft();
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateLeft();
 					} else if (fate < 20) {
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateRight();
+					} else if (fate < 30) {
 						myDirection=rc.getLocation().directionTo(enemyHQ).rotateRight().rotateRight();
-					} else {
+                                        } else if (fate < 40) {
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateLeft().rotateLeft();
+                                        } else if (fate < 50) {
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateLeft().rotateLeft().rotateLeft();
+                                        } else if (fate < 60) {
+						myDirection=rc.getLocation().directionTo(enemyHQ).rotateRight().rotateRight().rotateRight();
+                                        } else if (fate < 70){
 						myDirection=rc.getLocation().directionTo(enemyHQ).opposite();
+					} else {
+						myDirection=rc.getLocation().directionTo(enemyHQ);
 					}
 				}
 				tryMove(myDirection);
-			} else if (rc.senseOre(rc.getLocation()) > 0) {
+                         }else if (rc.senseOre(rc.getLocation()) > 5) {
 				rc.mine();
-			} else { //run awwayy!
+                                
+                        }else if (distanceBetween(rc.getLocation(), myHQ) < 20){
+                                int fate = rand.nextInt(640);
+                                if (fate < 10) {
+						myDirection=myDirection.rotateLeft();
+                                                tryMove(myDirection);
+					} else if (fate < 20) {
+						myDirection=myDirection.rotateRight();
+                                                tryMove(myDirection);
+					} else if (fate < 30) {
+						myDirection=myDirection.rotateRight().rotateRight();
+                                                tryMove(myDirection);
+                                        } else if (fate < 40) {
+						myDirection=myDirection.rotateLeft().rotateLeft();
+                                                tryMove(myDirection);
+                                        } else if (fate < 50) {
+						myDirection=myDirection.rotateLeft().rotateLeft().rotateLeft();
+                                                tryMove(myDirection);
+                                        } else if (fate < 60) {
+						myDirection=myDirection.rotateRight().rotateRight().rotateRight();
+                                                tryMove(myDirection);
+                                        } else if (fate < 70){
+						myDirection=myDirection.opposite();
+                                                tryMove(myDirection);
+					} else if (fate < 80) {
+						
+                                                tryMove(myDirection);
+					}
+
+                        }else if (distanceBetween(rc.getLocation(), myHQ) >= 20){
+                                int fate = rand.nextInt(2);
+                                if (fate == 1){
+                                    myDirection = rc.getLocation().directionTo(myHQ);
+                                    tryMove(myDirection);
+                                }
+//                        }else if (rc.senseOre(rc.getLocation()) > 0) {
+//				rc.mine();
+			}else if (rc.senseOre(rc.getLocation()) <= 0) {
+                            
+				int fate = rand.nextInt(8);
+                                int fateInit = fate;
+                                boolean looped = false;
+                                while ((rc.senseOre(rc.getLocation().add(directions[fate])) == 0 || !rc.canMove(directions[fate])) && !looped){
+                                    fate = (fate + 1) %8;
+                                    if (fate == fateInit){
+                                        looped = true;
+                                    }
+                                   
+                                }
+                                if (!looped){
+                                    tryMove(directions[fate]);
+                                }else{
+                                    tryMove(directions[fate]);    
+                                }
+                                
+                        } else { //run awwayy!
 				tryMove(rc.getLocation().directionTo(myHQ).opposite());
 			}
 			//TODO: search for ore
@@ -198,21 +317,34 @@ public class RobotPlayer {
 	}
 	
 	static void barracks() throws GameActionException {
+                transferSupplies();
 		int fate = rand.nextInt(10000);
-
+                    //hello?
 		// get information broadcasted by the HQ
 		int numBeavers = rc.readBroadcast(0);
 		int numSoldiers = rc.readBroadcast(1);
 		int numBashers = rc.readBroadcast(2);
-
-		if (rc.isCoreReady() && rc.getTeamOre() >= 80 && fate < Math.pow(1.2,15-numSoldiers-numBashers+numBeavers)*10000) {
-			//if (rc.getTeamOre() > 80 && fate % 2 == 0) {
-				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.BASHER);
-//			} else {
+                int numTanks = rc.readBroadcast(3);
+                int numTankFactories = rc.readBroadcast(101);
+//&& rc.readBroadcast(101)>1 
+		if (rc.isCoreReady()  && rc.getTeamOre() >= 80 && fate < Math.pow(1.2,15-numSoldiers-numBashers+numBeavers)*10000 && (numSoldiers + numBashers) < 15 ) {
+			if (rc.getTeamOre() > 80 && numTankFactories == 0) {//&& fate % 2 == 0
+				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);//uncommented this code
+			} else if ((rc.isCoreReady() && rc.getTeamOre() > 80 && numTanks >= numSoldiers) || (rc.isCoreReady() && rc.getTeamOre() > 500)){
+                                trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
+                        }
+//                        else {
 //				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
 //			}
 		}
 	}
+        static void tankFactory() throws GameActionException {
+            transferSupplies();
+            int numTanks = rc.readBroadcast(3);
+            if ((rc.isCoreReady() && rc.getTeamOre() >= 250) || (rc.isCoreReady() && rc.getTeamOre() > 1000)){
+                trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.TANK);
+            }
+        }
 	
 	/*Helper Methods*/
     // This method will attack an enemy in sight, if there is one
@@ -225,13 +357,14 @@ public class RobotPlayer {
     // This method will attempt to move in Direction d (or as close to it as possible)
 	static boolean tryMove(Direction d) throws GameActionException {
 		int offsetIndex = 0;
-		int[] offsets = {0,1,-1,2,-2,3,-3,4};
+		int[] offsets = {0,1,-1,2,-2};
 		int dirint = directionToInt(d);
 		boolean blocked = false;
-		while (offsetIndex < 8 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
+		while (offsetIndex < 5 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
 			offsetIndex++;
 		}
-		if (offsetIndex < 8) {
+		if (offsetIndex < 5) {
+
 			rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
 			return true;
 		} else {
