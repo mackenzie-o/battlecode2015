@@ -1,4 +1,4 @@
-package tehnummurone;
+package team166;
 
 import battlecode.common.*;
 import java.util.*;
@@ -22,12 +22,12 @@ public class RobotPlayer {
 	
 	public static void run(RobotController tomatojuice) {
 		rc = tomatojuice;
-        rand = new Random(rc.getID());
+                rand = new Random(rc.getID());
 
 		attack = false;
 		myRange = rc.getType().attackRadiusSquared;
 		MapLocation enemyLoc = rc.senseEnemyHQLocation();
-        Direction lastDirection = null;
+                Direction lastDirection = null;
 		myTeam = rc.getTeam();
 		enemyTeam = myTeam.opponent();
 		myHQ = rc.senseHQLocation();
@@ -104,8 +104,27 @@ public class RobotPlayer {
 			rc.yield();
 		}
 	}
+        static void transferSupplies() throws GameActionException {
+            rc.setIndicatorString(1, "Transfering Supplies");
+            RobotInfo[] nearbyAllies = rc.senseNearbyRobots(rc.getLocation(), GameConstants.SUPPLY_TRANSFER_RADIUS_SQUARED, rc.getTeam());
+            double lowestSupply = rc.getSupplyLevel();
+            double transferAmount = 0;
+            MapLocation suppliesToThisLocation = null;
+            for (RobotInfo ri:nearbyAllies){
+                if (ri.supplyLevel < lowestSupply){
+                    lowestSupply = ri.supplyLevel;
+                    transferAmount = (rc.getSupplyLevel() - ri.supplyLevel)/2;
+                    suppliesToThisLocation = ri.location;
+                }
+            }
+            if(suppliesToThisLocation != null){
+                rc.transferSupplies((int)transferAmount, suppliesToThisLocation);
+            }
+        }  
+        
 	/*Robot Type Methods*/
 	static void hq() throws GameActionException {
+                transferSupplies();
 		int fate = rand.nextInt(10000);
 		myRobots = rc.senseNearbyRobots(999999, myTeam);
 		int numSoldiers = 0;
@@ -153,12 +172,14 @@ public class RobotPlayer {
 	}
 	
 	static void tower() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
 	}
 	
 	static void basher() throws GameActionException {
+                transferSupplies();
 		RobotInfo[] adjacentEnemies = rc.senseNearbyRobots(2, enemyTeam);
 		
 		// BASHERs attack automatically, so let's just move around mostly randomly
@@ -168,6 +189,7 @@ public class RobotPlayer {
 	}
 	
 	static void soldier() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
@@ -177,6 +199,7 @@ public class RobotPlayer {
 
 	}
         static void tank() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
@@ -187,11 +210,12 @@ public class RobotPlayer {
 	}
 	
 	static void beaver() throws GameActionException {
+                transferSupplies();
 		if (rc.isWeaponReady()) {
 			attackSomething();
 		}
 		if (rc.isCoreReady()) {
-			if (rc.getTeamOre() >= 400 && rc.readBroadcast(100)<3) {
+			if (rc.getTeamOre() >= 400 && rc.readBroadcast(100)<2) {
 				tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
 			} else if (rc.getTeamOre() >= 100 && rc.readBroadcast(99)<1){ 
 				tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
@@ -286,6 +310,7 @@ public class RobotPlayer {
 	}
 	
 	static void barracks() throws GameActionException {
+                transferSupplies();
 		int fate = rand.nextInt(10000);
                     //hello?
 		// get information broadcasted by the HQ
@@ -293,18 +318,23 @@ public class RobotPlayer {
 		int numSoldiers = rc.readBroadcast(1);
 		int numBashers = rc.readBroadcast(2);
                 int numTanks = rc.readBroadcast(3);
+                int numTankFactories = rc.readBroadcast(101);
 //&& rc.readBroadcast(101)>1 
-		if (rc.isCoreReady()  && rc.getTeamOre() >= 80 && fate < Math.pow(1.2,15-numSoldiers-numBashers+numBeavers)*10000 && (numSoldiers + numBashers) < 20 ) {
-			if (rc.getTeamOre() > 80 && fate % 2 == 0) {
-				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.BASHER);//uncommented this code
-			} else {
-				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
-			}
+		if (rc.isCoreReady()  && rc.getTeamOre() >= 80 && fate < Math.pow(1.2,15-numSoldiers-numBashers+numBeavers)*10000 && (numSoldiers + numBashers) < 15 ) {
+			if (rc.getTeamOre() > 80 && numTankFactories == 0) {//&& fate % 2 == 0
+				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);//uncommented this code
+			} else if ((rc.isCoreReady() && rc.getTeamOre() > 80 && numTanks >= (int)(numSoldiers)) || (rc.isCoreReady() && rc.getTeamOre() > 500)){
+                                trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
+                        }
+//                        else {
+//				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
+//			}
 		}
 	}
         static void tankFactory() throws GameActionException {
+            transferSupplies();
             int numTanks = rc.readBroadcast(3);
-            if (rc.isCoreReady() && rc.getTeamOre() >= 250){
+            if ((rc.isCoreReady() && rc.getTeamOre() >= 250) || (rc.isCoreReady() && rc.getTeamOre() > 1000)){
                 trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.TANK);
             }
         }
