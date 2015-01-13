@@ -1,4 +1,4 @@
-package tehnummurone;
+package team166;
 
 import battlecode.common.*;
 
@@ -18,6 +18,7 @@ public class RobotPlayer {
 	static boolean clockwise;
 	static boolean bug;
 	static int howClose;
+	static int[][] surrounding;
 	static Random rand;
 	static RobotInfo[] myRobots;
 	static boolean attack;
@@ -38,6 +39,10 @@ public class RobotPlayer {
 		myHQ = rc.senseHQLocation();
 		enemyHQ = rc.senseEnemyHQLocation();
 		rally = getRally();
+		howClose = 100000;
+		bug = false;
+		surrounding =  new int [3][3];
+		
 		rc.setIndicatorString(0, "I am a " + rc.getType());
 
 		while(true) {
@@ -256,11 +261,11 @@ public class RobotPlayer {
 		int[] offsets = {0,1,-1,2,-2,3,-3,4};
 		int dirint = directionToInt(d);
 		boolean blocked = false;
-		while (offsetIndex < 8 && !rc.canMove(directions[(dirint+offsets[offsetIndex]+8)%8])) {
+		while (offsetIndex < 8 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
 			offsetIndex++;
 		}
 		if (offsetIndex < 8) {
-			rc.build(directions[(dirint+offsets[offsetIndex]+8)%8], type);
+			rc.build(directions[(dirint + offsets[offsetIndex] + 8) % 8], type);
 		}
 	}
 	static int directionToInt(Direction d) {
@@ -332,14 +337,16 @@ public class RobotPlayer {
 	static void bugMove(MapLocation m) throws GameActionException {
 		MapLocation cur = rc.getLocation();
 		Direction optimal = cur.directionTo(m);
-		if(rc.canMove(optimal) && howClose < distanceBetween(rc.getLocation().add(optimal), rally)){
+		if(rc.canMove(optimal) && howClose > distanceBetween(rc.getLocation().add(optimal), rally)){
 			//I want to go to there
-			rc.setIndicatorString(1, "going straight there!");
+			rc.setIndicatorString(1, howClose + " " + distanceBetween(rc.getLocation().add(optimal), rally) + " " +!wasThereBefore(optimal));
 			myDirection = null;
+			bug = false;
 			rc.move(optimal);
-		} else if (terrainTileIsNull(optimal)){
+		} else if (terrainTileIsNull(optimal) || bug){
 			//bug
-			rc.setIndicatorString(1, "bug around");
+			bug = true;
+			rc.setIndicatorString(1, "bug around ");
 			if(myDirection == null){
 				if(distanceBetween(rc.getLocation().add(optimal.rotateLeft()), m)<distanceBetween(rc.getLocation().add(optimal.rotateRight()), m)){
 					myDirection = optimal.rotateRight();
@@ -359,21 +366,23 @@ public class RobotPlayer {
 			}
 			
 			if (clockwise){
-				while(!terrainTileIsNull(myDirection.rotateRight())){
+				while(!terrainTileIsNull(myDirection.rotateRight())|| wasThereBefore(myDirection)){
 					myDirection = myDirection.rotateRight();
 				}
 			} else {
-				while(!terrainTileIsNull(myDirection.rotateLeft())){
+				while(!terrainTileIsNull(myDirection.rotateLeft()) || wasThereBefore(myDirection)){
 					myDirection = myDirection.rotateLeft();
 				}
 			}
 
 			if(rc.canMove(myDirection)){
 				rc.move(myDirection);
+				mapMove(myDirection);
 			}
 			
 		}else {
 			rc.setIndicatorString(1, "Moving around somebody");
+			bug = false;
 			tryMove(optimal);
 		}
 		if (howClose > distanceBetween(rc.getLocation(), rally)){
@@ -381,26 +390,64 @@ public class RobotPlayer {
 		}
 	}
 
-	static int directionToInt(Direction d) {
-		switch(d) {
+	static boolean wasThereBefore(Direction move){
+		int result = -1;
+		switch(move) {
 			case NORTH:
-				return 0;
+				result = surrounding[0][1];
+				break;
 			case NORTH_EAST:
-				return 1;
+				result = surrounding[0][2];
+				break;
 			case EAST:
-				return 2;
+				result = surrounding[1][2];
+				break;
 			case SOUTH_EAST:
-				return 3;
+				result = surrounding[2][2];
+				break;
 			case SOUTH:
-				return 4;
+				result = surrounding[2][1];
+				break;
 			case SOUTH_WEST:
-				return 5;
+				result = surrounding[2][0];
+				break;
 			case WEST:
-				return 6;
+				result = surrounding[1][0];
+				break;
 			case NORTH_WEST:
-				return 7;
-			default:
-				return -1;
+				result = surrounding[0][0];
+				break;
+		}
+		return result == 1;
+	}
+
+	static void mapMove(Direction move){
+		surrounding = new int[3][3];
+		switch(move.opposite()) {
+			case NORTH:
+				surrounding[0][1] = 1;
+				break;
+			case NORTH_EAST:
+				surrounding[0][2] = 1;
+				break;
+			case EAST:
+				surrounding[1][2] = 1;
+				break;
+			case SOUTH_EAST:
+				surrounding[2][2] = 1;
+				break;
+			case SOUTH:
+				surrounding[2][1] = 1;
+				break;
+			case SOUTH_WEST:
+				surrounding[2][0] = 1;
+				break;
+			case WEST:
+				surrounding[1][0] = 1;
+				break;
+			case NORTH_WEST:
+				surrounding[0][0] = 1;
+				break;
 		}
 	}
 	
