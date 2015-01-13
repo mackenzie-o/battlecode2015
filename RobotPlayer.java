@@ -21,8 +21,6 @@ public class RobotPlayer {
 	static Random rand;
 	static RobotInfo[] myRobots;
 	static boolean attack;
-	static boolean followEdge;
-	static int[][] surrounding;
 	static Direction[] directions = {Direction.NORTH, Direction.NORTH_EAST, Direction.EAST, 
 										Direction.SOUTH_EAST, Direction.SOUTH, Direction.SOUTH_WEST, 
 										Direction.WEST, Direction.NORTH_WEST};
@@ -31,7 +29,6 @@ public class RobotPlayer {
 		rc = tomatojuice;
         rand = new Random(rc.getID());
 		
-		followEdge = false;
 		attack = false;
 		myRange = rc.getType().attackRadiusSquared;
 		MapLocation enemyLoc = rc.senseEnemyHQLocation();
@@ -42,10 +39,9 @@ public class RobotPlayer {
 		enemyHQ = rc.senseEnemyHQLocation();
 		rally = getRally();
 		rc.setIndicatorString(0, "I am a " + rc.getType());
-		surrounding = new int[3][3];
 
 		while(true) {
-			//rc.setIndicatorString(1, "");
+			rc.setIndicatorString(1, "");
 			
 			if (rc.getType() == RobotType.HQ) {
 				try {		
@@ -227,11 +223,10 @@ public class RobotPlayer {
 		int[] offsets = {0,1,-1,2,-2,3,-3,4};
 		int dirint = directionToInt(d);
 		boolean blocked = false;
-		while (offsetIndex < 8 && !checkCanMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
+		while (offsetIndex < 8 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
 			offsetIndex++;
 		}
 		if (offsetIndex < 8) {
-			mapMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
 			rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
 			return true;
 		} else {
@@ -333,175 +328,25 @@ public class RobotPlayer {
 		
 		
 	}
-	
-	static void mapMove(Direction move){
-		surrounding = new int[3][3];
-		switch(move.opposite()) {
-			case NORTH:
-				surrounding[0][1] = 1;
-				break;
-			case NORTH_EAST:
-				surrounding[0][2] = 1;
-				break;
-			case EAST:
-				surrounding[1][2] = 1;
-				break;
-			case SOUTH_EAST:
-				surrounding[2][2] = 1;
-				break;
-			case SOUTH:
-				surrounding[2][1] = 1;
-				break;
-			case SOUTH_WEST:
-				surrounding[2][0] = 1;
-				break;
-			case WEST:
-				surrounding[1][0] = 1;
-				break;
-			case NORTH_WEST:
-				surrounding[0][0] = 1;
-				break;
-		}
-	}
-	
-	static boolean checkCanMove(Direction d){
-		return rc.canMove(d) && !wasThereBefore(d);
-	}
-	
-	static boolean wasThereBefore(Direction move){
-		int result = -1;
-		switch(move) {
-			case NORTH:
-				result = surrounding[0][1];
-				break;
-			case NORTH_EAST:
-				result = surrounding[0][2];
-				break;
-			case EAST:
-				result = surrounding[1][2];
-				break;
-			case SOUTH_EAST:
-				result = surrounding[2][2];
-				break;
-			case SOUTH:
-				result = surrounding[2][1];
-				break;
-			case SOUTH_WEST:
-				result = surrounding[2][0];
-				break;
-			case WEST:
-				result = surrounding[1][0];
-				break;
-			case NORTH_WEST:
-				result = surrounding[0][0];
-				break;
-		}
-		return result == 1;
-	}
-	static MapLocation followSimpleEdge(MapLocation start, MapLocation wall, Direction prefered){
-		int offsetIndex = 0;
-		int[] offsets = {0, 1, -1, 2, -2, 3, -3, 4};
-		int dirint = directionToInt(prefered);
-		while (offsetIndex < 8 &&
-				(!wall.isAdjacentTo(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])) ||
-						!rc.senseTerrainTile(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])).isTraversable() ||
-						//!hasNeighboringNull(start.add(directions[(dirint+offsets[offsetIndex] + 8) % 8])) ||
-						wasThereBefore(directions[(dirint + offsets[offsetIndex] + 8) % 8])
-				)) {
-			offsetIndex++;
-		}
-		if (offsetIndex < 8)
-			return start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
-		else return start;
-	}
-	
-	static MapLocation followHardEdge(MapLocation start, Direction prefered){
-		MapLocation[] nulls = getAllNeighboringNull(start);
-		int offsetIndex;
-		
-		int[] offsets = {0, 1, -1, 2, -2, 3, -3, 4};
-		int dirint = directionToInt(prefered);
-		for(int i=0; i<nulls.length; i++) {
-			offsetIndex = 0;
-			if (nulls[i] != null) {
-				while (offsetIndex < 8 &&
-						(!nulls[i].isAdjacentTo(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])) ||
-								!rc.senseTerrainTile(start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8])).isTraversable() ||
-								//!hasNeighboringNull(start.add(directions[(dirint+offsets[offsetIndex] + 8) % 8])) ||
-								wasThereBefore(directions[(dirint + offsets[offsetIndex] + 8) % 8]))) {
-					offsetIndex++;
-				}
-				if (offsetIndex < 8)
-					return start.add(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
-			}
-		}
-		return start;
-	}
-	
-	static boolean hasNeighboringNull(MapLocation target){
-		TerrainTile tile;
-		for(int i=0; i< directions.length; i++){
-			tile = rc.senseTerrainTile(target.add(directions[i]));
-			if(!tile.isTraversable()){
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	static MapLocation getNeighboringNull(MapLocation target) {
-		int index = 0;
-		TerrainTile tile;
-		for (int i=0; i<directions.length; i++){
-			tile = rc.senseTerrainTile(target.add(directions[index]));
-			if(!tile.isTraversable()){
-				return target.add(directions[index]);
-			}
-			index = (index + 2);
-			if(index == 8) index = 1;
-		}
-		System.out.println("I should not be here!");
-		return null;
-	}
 
-	static MapLocation[] getAllNeighboringNull(MapLocation target) {
-		int index = 0;
-		int next = 0;
-		MapLocation[] results = new MapLocation[8];
-		TerrainTile tile;
-		for (int i=0; i<directions.length; i++){
-			tile = rc.senseTerrainTile(target.add(directions[index]));
-			if(!tile.isTraversable()){
-				results[next] = target.add(directions[index]);
-				next++;
-			}
-			index = (index + 2);
-			if(index == 8) index = 1;
-		}
-		return results;
-	}
-
-	static boolean bugMove(MapLocation m) throws GameActionException {
+	static void bugMove(MapLocation m) throws GameActionException {
 		MapLocation cur = rc.getLocation();
 		Direction optimal = cur.directionTo(m);
-		System.out.println("i'm trying to move");
-		if(rc.canMove(optimal)){
+		if(rc.canMove(optimal) && howClose < distanceBetween(rc.getLocation().add(optimal), rally)){
 			//I want to go to there
+			rc.setIndicatorString(1, "going straight there!");
+			myDirection = null;
 			rc.move(optimal);
 		} else if (terrainTileIsNull(optimal)){
 			//bug
-			System.out.println("I found a wall");
+			rc.setIndicatorString(1, "bug around");
 			if(myDirection == null){
-				System.out.println("finding direction");
 				if(distanceBetween(rc.getLocation().add(optimal.rotateLeft()), m)<distanceBetween(rc.getLocation().add(optimal.rotateRight()), m)){
 					myDirection = optimal.rotateRight();
 					clockwise = false;
-					rc.setIndicatorString(1, "turning counter-clockwise");
-					
 				}else{
 					myDirection = optimal.rotateLeft();
 					clockwise = true;
-					rc.setIndicatorString(1, "turning clockwise");
 				}
 			}
 			
@@ -522,22 +367,44 @@ public class RobotPlayer {
 					myDirection = myDirection.rotateLeft();
 				}
 			}
-			
+
 			if(rc.canMove(myDirection)){
 				rc.move(myDirection);
-			}else{
-				tryMove(myDirection);
 			}
 			
 		}else {
+			rc.setIndicatorString(1, "Moving around somebody");
 			tryMove(optimal);
 		}
-		
-		return true;
+		if (howClose > distanceBetween(rc.getLocation(), rally)){
+			howClose = distanceBetween(rc.getLocation(), rally);
+		}
+	}
+
+	static int directionToInt(Direction d) {
+		switch(d) {
+			case NORTH:
+				return 0;
+			case NORTH_EAST:
+				return 1;
+			case EAST:
+				return 2;
+			case SOUTH_EAST:
+				return 3;
+			case SOUTH:
+				return 4;
+			case SOUTH_WEST:
+				return 5;
+			case WEST:
+				return 6;
+			case NORTH_WEST:
+				return 7;
+			default:
+				return -1;
+		}
 	}
 	
 	static boolean terrainTileIsNull(Direction dir){
-		System.out.println("check that tile");
-		return rc.senseTerrainTile(rc.getLocation().add(dir)).isTraversable();
+		return !rc.senseTerrainTile(rc.getLocation().add(dir)).isTraversable();
 	}
 }
