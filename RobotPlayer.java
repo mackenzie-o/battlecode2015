@@ -3,7 +3,6 @@ package team166;
 import battlecode.common.*;
 
 import java.util.*;
-import java.lang.Math;
 
 public class RobotPlayer {
     static RobotController rc;
@@ -39,6 +38,7 @@ public class RobotPlayer {
         rally = getRally();
         howClose = 100000;
         bug = false;
+        clockwise = false;
         surrounding = new int[3][3];
 
         rc.setIndicatorString(0, "I am a " + rc.getType());
@@ -179,7 +179,7 @@ public class RobotPlayer {
             attackSomething();
         }
 
-        if (rc.isCoreReady() && rc.getTeamOre() >= 100 && numBeavers < 5) {
+        if (rc.isCoreReady() && rc.getTeamOre() >= 100 && numBeavers < 2) {
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.BEAVER);
         }
     }
@@ -222,7 +222,9 @@ public class RobotPlayer {
     
     static void miner() throws GameActionException {
         transferSupplies();
-        
+        if(rc.isWeaponReady()){
+            attackSomething();
+        }
         if(rc.isCoreReady()){
             if(rc.canMine() && rc.senseOre(rc.getLocation()) > 5){
                 rc.setIndicatorString(1, "Mining...");
@@ -232,24 +234,15 @@ public class RobotPlayer {
                 MapLocation goal = findBestOre();
                 if(goal != rc.getLocation()){
                     rc.setIndicatorString(1, "Moving to sensed square");
-                    tryMove(rc.getLocation().directionTo(goal));
+                    bug(goal);
                 }else if (rc.readBroadcast(201) != 0 && rc.readBroadcast(202) != 0){
                     rc.setIndicatorString(1, "Moving to broadcasted square: "+rc.readBroadcast(201)+" "+ rc.readBroadcast(202));
-                    tryMove(rc.getLocation().directionTo(new MapLocation(rc.readBroadcast(201), rc.readBroadcast(202))));
+                    bug(new MapLocation(rc.readBroadcast(201), rc.readBroadcast(202)));
                 }else {
                     rc.setIndicatorString(1, "Moving in random direction");
                 }
             }
         }
-        
-//        if(rc.isCoreReady() && rc.canMine()) {
-//            rc.mine();
-//        }else if (!rc.canMine()) {
-//            if(myDirection==null){
-//                myDirection = directions[rand.nextInt(8)];
-//            }
-//            tryMove(myDirection);
-//        }
     }
 
     static void beaver() throws GameActionException {
@@ -288,7 +281,7 @@ public class RobotPlayer {
                         myDirection = rc.getLocation().directionTo(enemyHQ);
                     }
                 }
-                tryMove(myDirection);
+                tryMove(myDirection, "");
             } else if (rc.senseOre(rc.getLocation()) > 5) {
                 rc.mine();
 
@@ -296,35 +289,35 @@ public class RobotPlayer {
                 int fate = rand.nextInt(640);
                 if (fate < 10) {
                     myDirection = myDirection.rotateLeft();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 20) {
                     myDirection = myDirection.rotateRight();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 30) {
                     myDirection = myDirection.rotateRight().rotateRight();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 40) {
                     myDirection = myDirection.rotateLeft().rotateLeft();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 50) {
                     myDirection = myDirection.rotateLeft().rotateLeft().rotateLeft();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 60) {
                     myDirection = myDirection.rotateRight().rotateRight().rotateRight();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 70) {
                     myDirection = myDirection.opposite();
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 } else if (fate < 80) {
 
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 }
 
             } else if (distanceBetween(rc.getLocation(), myHQ) >= 20) {
                 int fate = rand.nextInt(2);
                 if (fate == 1) {
                     myDirection = rc.getLocation().directionTo(myHQ);
-                    tryMove(myDirection);
+                    tryMove(myDirection, "");
                 }
 //                        }else if (rc.senseOre(rc.getLocation()) > 0) {
 //				rc.mine();
@@ -341,13 +334,13 @@ public class RobotPlayer {
 
                 }
                 if (!looped) {
-                    tryMove(directions[fate]);
+                    tryMove(directions[fate], "");
                 } else {
-                    tryMove(directions[fate]);
+                    tryMove(directions[fate], "");
                 }
 
             } else { //run awwayy!
-                tryMove(rc.getLocation().directionTo(myHQ).opposite());
+                tryMove(rc.getLocation().directionTo(myHQ).opposite(), "");
             }
             //TODO: search for ore
         }
@@ -356,7 +349,6 @@ public class RobotPlayer {
     static void barracks() throws GameActionException {
         transferSupplies();
         int fate = rand.nextInt(10000);
-        //hello?
         // get information broadcasted by the HQ
         int numBeavers = rc.readBroadcast(0);
         int numSoldiers = rc.readBroadcast(1);
@@ -364,9 +356,9 @@ public class RobotPlayer {
         int numTanks = rc.readBroadcast(3);
         int numTankFactories = rc.readBroadcast(101);
 //&& rc.readBroadcast(101)>1 
-        if (rc.isCoreReady() && rc.getTeamOre() >= 80 && fate < Math.pow(1.2, 15 - numSoldiers - numBashers + numBeavers) * 10000 && (numSoldiers + numBashers) < 15) {
+        if (rc.isCoreReady() && rc.getTeamOre() >= 80 ) {
             if (rc.getTeamOre() > 80 && numTankFactories == 0) {//&& fate % 2 == 0
-                trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.SOLDIER);//uncommented this code
+                trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.SOLDIER);
             } else if ((rc.isCoreReady() && rc.getTeamOre() > 80 && numTanks >= numSoldiers) || (rc.isCoreReady() && rc.getTeamOre() > 500)) {
                 trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.SOLDIER);
             }
@@ -385,7 +377,7 @@ public class RobotPlayer {
     }
 
     static void minerFactory() throws GameActionException {
-        if (rc.isCoreReady() && rc.getTeamOre() >= 50 && rc.readBroadcast(4) <30 ) {
+        if (rc.isCoreReady() && rc.getTeamOre() >= 50 && rc.readBroadcast(4) <15 ) { // TODO make function of map size
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.MINER);
         }
         
@@ -401,94 +393,46 @@ public class RobotPlayer {
     }
     
     // This method will attempt to move in Direction d (or as close to it as possible)
-    static boolean tryMove(Direction d) throws GameActionException {
+    static boolean tryMove(Direction d, String info) throws GameActionException {
         int offsetIndex = 0;
         int[] offsets = {0, 1, -1, 2, -2};
         int dirint = directionToInt(d);
         boolean blocked = false;
-        while (offsetIndex < 5 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
+        while (offsetIndex < 5 && !moveIsGood(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
             offsetIndex++;
         }
         if (offsetIndex < 5) {
-
+            if(rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]))
+                rc.setIndicatorString(1, info + " move good:" +directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+            else rc.setIndicatorString(1, info + " move bad:" + directions[(dirint + offsets[offsetIndex] + 8) % 8]);
             rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+            //mapMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
             return true;
         } else {
-            rc.setIndicatorString(1, "I am stuck");
+            rc.setIndicatorString(1, info + "move failed");
             return false;
         }
     }
 
     static void moveToRally() throws GameActionException {
         int distanceToGoal = distanceBetween(rc.getLocation(), rally);
-        if (attack || (distanceToGoal < 10 && Clock.getRoundNum() % 250 < 10)) {
+//        if(distanceToGoal < 10 && rc.readBroadcast(60)==0 ){
+//            if(clockwise) rc.broadcast(60, 1);
+//            else rc.broadcast(60, 2);
+//        }
+        
+        if (attack || (distanceToGoal < 50 && Clock.getRoundNum() % 250 < 10)) {
             rally = new MapLocation(rc.readBroadcast(50), rc.readBroadcast(51));
             attack = true;
-            //TODO: should eventually go for nearest tower
         }
 
         if (distanceToGoal > 2)
-            bugMove(rally);
+            bug(rally);
         else
             rc.setIndicatorString(1, "waiting...");
         //TODO: while waiting, find nearish enemies and KILL THEM
     }
 
-    static void bugMove(MapLocation m) throws GameActionException {
-        MapLocation cur = rc.getLocation();
-        Direction optimal = cur.directionTo(m);
-        if (rc.canMove(optimal) && howClose > distanceBetween(rc.getLocation().add(optimal), rally)) {
-            //I want to go to there
-            rc.setIndicatorString(1, howClose + " " + distanceBetween(rc.getLocation().add(optimal), rally) + " " + !wasThereBefore(optimal));
-            myDirection = null;
-            bug = false;
-            rc.move(optimal);
-        } else if (terrainTileIsNull(optimal) || bug) {
-            //bug
-            bug = true;
-            rc.setIndicatorString(1, "bug around ");
-            if (myDirection == null) {
-                if (distanceBetween(rc.getLocation().add(optimal.rotateLeft()), m) < distanceBetween(rc.getLocation().add(optimal.rotateRight()), m)) {
-                    myDirection = optimal.rotateRight();
-                    clockwise = false;
-                } else {
-                    myDirection = optimal.rotateLeft();
-                    clockwise = true;
-                }
-            }
-
-            while (terrainTileIsNull(myDirection)) {
-                if (clockwise) {
-                    myDirection = myDirection.rotateRight();
-                } else {
-                    myDirection = myDirection.rotateLeft();
-                }
-            }
-
-            if (clockwise) {
-                while (!terrainTileIsNull(myDirection.rotateRight()) || wasThereBefore(myDirection)) {
-                    myDirection = myDirection.rotateRight();
-                }
-            } else {
-                while (!terrainTileIsNull(myDirection.rotateLeft()) || wasThereBefore(myDirection)) {
-                    myDirection = myDirection.rotateLeft();
-                }
-            }
-
-            if (rc.canMove(myDirection)) {
-                rc.move(myDirection);
-                mapMove(myDirection);
-            }
-
-        } else {
-            rc.setIndicatorString(1, "Moving around somebody");
-            bug = false;
-            tryMove(optimal);
-        }
-        if (howClose > distanceBetween(rc.getLocation(), rally)) {
-            howClose = distanceBetween(rc.getLocation(), rally);
-        }
-    }
     
     // This method will attempt to spawn in the given direction (or as close to it as possible)
     static void trySpawn(Direction d, RobotType type) throws GameActionException {
@@ -512,7 +456,8 @@ public class RobotPlayer {
         int[] offsets = {0, 1, -1, 2, -2, 3, -3, 4};
         int dirint = directionToInt(d);
         boolean blocked = false;
-        while (offsetIndex < 8 && !rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])) {
+        while (offsetIndex < 8 && (!rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]) ||
+                (rc.getLocation().add(directions[(dirint + offsets[offsetIndex] + 8) % 8]).x%2 != rc.getLocation().add(directions[(dirint + offsets[offsetIndex] + 8) % 8]).y%2))) {
             offsetIndex++;
         }
         if (offsetIndex < 8) {
@@ -545,7 +490,7 @@ public class RobotPlayer {
     }
 
     static int distanceBetween(MapLocation a, MapLocation b) {
-        return (int) Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+        return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
     }
 
     static MapLocation getRally() {
@@ -657,7 +602,7 @@ public class RobotPlayer {
     }
     
     static MapLocation findBestOre() throws GameActionException{
-        MapLocation locs [] = MapLocation.getAllMapLocationsWithinRadiusSq(rc.getLocation(), 10);
+        MapLocation locs [] = MapLocation.getAllMapLocationsWithinRadiusSq(rc.getLocation(), 20);
         MapLocation currentLoc = rc.getLocation();
         MapLocation bestLoc = currentLoc;
         double bestOre = 5;
@@ -671,7 +616,13 @@ public class RobotPlayer {
                 }
             }
         }
-        //broadcast
+        //if you are at the broadcasted location and the broadcasted ore amount is outdated, update ore count
+        if(distanceBetween(currentLoc, new MapLocation(rc.readBroadcast(201), rc.readBroadcast(202))) < 25 && 
+                (int)bestOre < rc.readBroadcast(200)){
+            rc.broadcast(200, (int) bestOre);
+        }
+        
+        //if your ore is the best, tell 'em about it
         if(bestOre > rc.readBroadcast(200) || (Clock.getRoundNum() > rc.readBroadcast(203)+10 && bestOre == rc.readBroadcast(200))){
             rc.broadcast(200, (int)bestOre);
             rc.broadcast(201, bestLoc.x);
@@ -682,5 +633,95 @@ public class RobotPlayer {
         return bestLoc;
     }
     
+    static Direction dirCloserToRally(int closest, Direction goal){
+        if (closest > distanceBetween(rc.getLocation().add(goal), rally) && !terrainTileIsNull(goal) && !wasThereBefore(goal)){
+            return goal;
+        } else if (closest > distanceBetween(rc.getLocation().add(goal.rotateLeft()), rally) && !terrainTileIsNull(goal.rotateLeft()) && !wasThereBefore(goal.rotateLeft())){
+            return goal.rotateLeft();
+        } else if (closest > distanceBetween(rc.getLocation().add(goal.rotateRight()), rally) && !terrainTileIsNull(goal.rotateRight()) && !wasThereBefore(goal.rotateRight())){
+            return goal.rotateRight();
+        } else {
+            return Direction.NONE;
+        }
+    }
     
+    static boolean moveIsGood(Direction dir){
+        //iff: square is open, square is traversable, square is not too close to tower
+        return rc.canMove(dir) && (attack || !isInTowerRange(rc.getLocation().add(dir)));
+        //return rc.canMove(dir) && !isInTowerRange(rc.getLocation().add(dir));
+    }
+    
+    static boolean isInTowerRange(MapLocation move){
+        MapLocation[] towers = rc.senseEnemyTowerLocations();
+        for(int i=0; i< towers.length; i++){
+            if(towers[i].distanceSquaredTo(move)<25){
+                return true;
+            }
+        }
+        //assume HQ won't be a problem
+        return false;
+    }
+    
+    static void bug(MapLocation goal) throws GameActionException{
+        //get straight line to goal
+        //if: you can move straight to the goal && (it gets you closer than ever before || to the left gets you closer || to the right gets you closer)
+            //try to move that way
+        //else if: the block in front of you is null
+            //pick clockwise/counterclockwise somehow
+            //rotate in that direction until you have a square that is not null immediatly before a null one
+            //if you don't find anything valid in that direction, try rotating the other way
+            //if you find something valid, try to move there
+        //else: just move as close as you can to goal directon, you are probably behind somebody
+        //are you closer? then save that distance
+        String digest = "";
+        Direction optimal = rc.getLocation().directionTo(goal);
+        Direction closeEnough = dirCloserToRally(howClose, optimal);
+        if (rc.canMove(closeEnough) &&  closeEnough!= Direction.NONE){
+            digest +="going straight there:";
+            tryMove(closeEnough, digest);
+            bug = false;
+        } else if (bug || terrainTileIsNull(optimal)){
+            digest += "bug:";
+            bug = true;
+            Direction bugDir = rotate(optimal);
+            if (bugDir == Direction.NONE) {
+                digest += " switch to: "+!clockwise;
+                clockwise = !clockwise;
+                bugDir = rotate(optimal);
+                
+            }
+            if (bugDir != Direction.NONE && moveIsGood(bugDir)){
+                digest += " found: " + bugDir;
+                tryMove(bugDir, digest);
+                mapMove(bugDir);
+            }
+        } else {
+            digest+="movearound: ";
+            tryMove(optimal, digest);
+        }
+        
+        if(rally.distanceSquaredTo(rc.getLocation())<howClose){
+            howClose = rally.distanceSquaredTo(rc.getLocation());
+        }
+    }
+    
+    static Direction rotate(Direction cur){
+        int i = 0;
+        if (clockwise){
+            while((terrainTileIsNull(cur) || !terrainTileIsNull(cur.rotateRight()) || wasThereBefore(cur)) && i<8){
+                cur = cur.rotateRight();
+                i++;
+            }
+        } else {
+            while((terrainTileIsNull(cur) || !terrainTileIsNull(cur.rotateLeft()) || wasThereBefore(cur)) && i<8){
+                cur = cur.rotateLeft();
+                i++;
+            }
+        }
+        if(i==8 && (terrainTileIsNull(cur) || !terrainTileIsNull(cur.rotateLeft()) || wasThereBefore(cur))){
+            return Direction.NONE;
+        }
+        
+        return cur;
+    }
 }
