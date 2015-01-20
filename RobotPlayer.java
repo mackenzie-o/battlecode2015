@@ -1,6 +1,5 @@
 package team166;
 
-import battlecode.client.viewer.AbstractDrawObject.RobotInfo;
 import battlecode.common.*;
 
 import java.util.*;
@@ -394,49 +393,49 @@ public class RobotPlayer {
         dumpSupply();
 
     }
-    static void dumpSupply(){
-        if (rc.getHealth() <= 5){
-            RobotInfo nearAllies[] = senseNearbyRobots(15, myTeam);
-            if(nearAllies[0] != null){
-                switch(nearAllies[0].getType()){
-            case BEAVER:
-                rc.transferSupplies(rc.supplyLevel - 50, nearAllies[0].getLocation());
-                break;
-            case MINER:
-                rc.transferSupplies(rc.supplyLevel - 40, nearAllies[0].getLocation());
-                break;
-            case COMPUTER:
-                rc.transferSupplies(rc.supplyLevel - 10, nearAllies[0].getLocation());
-                break;
-            case BASHER:
-                rc.transferSupplies(rc.supplyLevel - 30, nearAllies[0].getLocation());
-                break;
-            case COMMANDER:
-                rc.transferSupplies(rc.supplyLevel - 25, nearAllies[0].getLocation());
-                break;
-            case LAUNCHER:
-                rc.transferSupplies(rc.supplyLevel - 125, nearAllies[0].getLocation());
-                break;
-            case MISSILE:
-                rc.transferSupplies(rc.supplyLevel, nearAllies[0].getLocation());
-                break;
-            case SOLDIER:
-                rc.transferSupplies(rc.supplyLevel - 25, nearAllies[0].getLocation());
-                break;
-            case TANK:
-                rc.transferSupplies(rc.supplyLevel - 75, nearAllies[0].getLocation());
-                break;
-            case DRONE:
-                rc.transferSupplies(rc.supplyLevel - 50, nearAllies[0].getLocation());
-                break;
-            default: //building probably
-                rc.transferSupplies(rc.supplyLevel, nearAllies[0].getLocation());
-                break;
-        }
-                
+
+    static void dumpSupply() throws GameActionException {
+        if (rc.getHealth() <= 5) {
+            RobotInfo nearAllies[] = rc.senseNearbyRobots(15, myTeam);
+            if (nearAllies.length > 0) {
+                switch (rc.getType()) {
+                    case BEAVER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 50, nearAllies[0].location);
+                        break;
+                    case MINER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 40, nearAllies[0].location);
+                        break;
+                    case COMPUTER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 10, nearAllies[0].location);
+                        break;
+                    case BASHER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 30, nearAllies[0].location);
+                        break;
+                    case COMMANDER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 25, nearAllies[0].location);
+                        break;
+                    case LAUNCHER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 125, nearAllies[0].location);
+                        break;
+                    case MISSILE:
+                        rc.transferSupplies((int) rc.getSupplyLevel(), nearAllies[0].location);
+                        break;
+                    case SOLDIER:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 25, nearAllies[0].location);
+                        break;
+                    case TANK:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 75, nearAllies[0].location);
+                        break;
+                    case DRONE:
+                        rc.transferSupplies((int) rc.getSupplyLevel() - 50, nearAllies[0].location);
+                        break;
+                    default: //building probably
+                        rc.transferSupplies((int) rc.getSupplyLevel(), nearAllies[0].location);
+                        break;
+                }
+
             }
         }
-        
     }
 
     /**
@@ -445,17 +444,17 @@ public class RobotPlayer {
     // This method will attack an enemy in sight, if there is one
     static void attackSomething() throws GameActionException {
         RobotInfo[] enemies = rc.senseNearbyRobots(myRange, enemyTeam);
-        if(enemies.length>0){
+        if (enemies.length > 0) {
             RobotInfo target = enemies[0];
             int targetThreat = getThreatLevel(target.type);
-            for(int i = 1; i < enemies.length; i++){
-                if(getThreatLevel(enemies[i].type) > targetThreat){
+            for (int i = 1; i < enemies.length; i++) {
+                if (getThreatLevel(enemies[i].type) > targetThreat) {
                     target = enemies[i];
                     targetThreat = getThreatLevel(enemies[i].type);
-                } else if (getThreatLevel(enemies[i].type) == targetThreat){
-                    if((enemies[i].location.distanceSquaredTo(rc.getLocation()) < 
+                } else if (getThreatLevel(enemies[i].type) == targetThreat) {
+                    if ((enemies[i].location.distanceSquaredTo(rc.getLocation()) <
                             target.location.distanceSquaredTo(rc.getLocation())) ||
-                            (enemies[i].health < target.health)){
+                            (enemies[i].health < target.health)) {
                         target = enemies[i];
                     }
                 }
@@ -463,8 +462,9 @@ public class RobotPlayer {
             rc.attackLocation(target.location);
         }
     }
-    static float getDamage(RobotType r){
-         switch(r){
+
+    static double getDamage(RobotType r) {
+        switch (r) {
             case BEAVER:
                 return 2;
             case MINER:
@@ -491,9 +491,9 @@ public class RobotPlayer {
                 return 0;
         }
     }
-    
-    static int getThreatLevel(RobotType r){
-        switch(r){
+
+    static int getThreatLevel(RobotType r) {
+        switch (r) {
             case BEAVER:
                 return 2;
             case MINER:
@@ -519,7 +519,7 @@ public class RobotPlayer {
             default: //building probably
                 return 0;
         }
-        
+
     }
 
     // This method will attempt to move in Direction d (or as close to it as possible)
