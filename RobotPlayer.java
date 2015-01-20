@@ -45,84 +45,47 @@ public class RobotPlayer {
 
         while (true) {
             //rc.setIndicatorString(1, "");
-
-            if (rc.getType() == RobotType.HQ) {
-                try {
-                    hq();
-                } catch (Exception e) {
-                    System.out.println("HQ Exception");
-                    e.printStackTrace();
+            try {
+                switch (rc.getType()) {
+                    case HQ:
+                        hq();
+                        break;
+                    case TOWER:
+                        tower();
+                        break;
+                    case BASHER:
+                        basher();
+                        break;
+                    case SOLDIER:
+                        soldier();
+                        break;
+                    case TANK:
+                        tank();
+                        break;
+                    case BEAVER:
+                        beaver();
+                        break;
+                    case BARRACKS:
+                        barracks();
+                        break;
+                    case TANKFACTORY:
+                        tankFactory();
+                        break;
+                    case MINERFACTORY:
+                        minerFactory();
+                        break;
+                    case MINER:
+                        miner();
+                        break;
+                    case SUPPLYDEPOT:
+                        break;
+                    default:
+                        System.out.println("... I don't know... help");
                 }
-            } else if (rc.getType() == RobotType.TOWER) {
-                try {
-                    tower();
-                } catch (Exception e) {
-                    System.out.println("Tower Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.BASHER) {
-                try {
-                    //basher code
-                    basher();
-                } catch (Exception e) {
-                    System.out.println("Basher Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.SOLDIER) {
-                try {
-                    soldier();
-                } catch (Exception e) {
-                    System.out.println("Soldier Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.TANK) {
-                try {
-                    tank();
-                } catch (Exception e) {
-                    System.out.println("Tank Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.BEAVER) {
-                try {
-                    beaver();
-                } catch (Exception e) {
-                    System.out.println("Beaver Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.BARRACKS) {
-                try {
-                    barracks();
-                } catch (Exception e) {
-                    System.out.println("Barracks Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.SUPPLYDEPOT) {
-                //do nothing
-            } else if (rc.getType() == RobotType.TANKFACTORY) {
-                try {
-                    tankFactory();
-                } catch (Exception e) {
-                    System.out.println("Tank Factory Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.MINERFACTORY) {
-                try {
-                    minerFactory();
-                } catch (Exception e) {
-                    System.out.println("Miner Factory Exception");
-                    e.printStackTrace();
-                }
-            } else if (rc.getType() == RobotType.MINER) {
-                try {
-                    miner();
-                } catch (Exception e) {
-                    System.out.println("Miner Exception");
-                    e.printStackTrace();
-                }
-            } else {
-                System.out.println("... I don't know... help");
+            }catch(Exception e) {
+                System.out.println(rc.getType()+"  Exception:");
+                e.printStackTrace();
             }
-
             rc.yield();
         }
     }
@@ -144,23 +107,23 @@ public class RobotPlayer {
         int numMiners = 0;
         int numTanks = 0;
         for (RobotInfo r : myRobots) {
-            RobotType type = r.type;
-            if (type == RobotType.SOLDIER) {
-                numSoldiers++;
-            } else if (type == RobotType.BASHER) {
-                numBashers++;
-            } else if (type == RobotType.BEAVER) {
-                numBeavers++;
-            } else if (type == RobotType.MINER) {
-                numMiners++;
-            } else if (type == RobotType.BARRACKS) {
-                numBarracks++;
-            } else if (type == RobotType.SUPPLYDEPOT) {
-                numSupplyDepots++;
-            } else if (type == RobotType.TANKFACTORY) {
-                numTankFactories++;
-            } else if (type == RobotType.MINERFACTORY) {
-                numMinerFactories++;
+            switch(r.type){
+                case BEAVER:
+                    numBeavers++; break;
+                case SOLDIER:
+                    numSoldiers++; break;
+                case BASHER:
+                    numBashers++; break;
+                case MINER:
+                    numMiners++; break;
+                case BARRACKS:
+                    numBarracks++; break;
+                case SUPPLYDEPOT:
+                    numSupplyDepots++; break;
+                case TANKFACTORY:
+                    numTankFactories++; break;
+                case MINERFACTORY:
+                    numMinerFactories++; break;
             }
         }
         rc.broadcast(0, numBeavers);
@@ -168,6 +131,7 @@ public class RobotPlayer {
         rc.broadcast(2, numBashers);
         rc.broadcast(3, numTanks);
         rc.broadcast(4, numMiners);
+        rc.broadcast(10, numSoldiers+numBashers+numTanks); //total army size
         rc.broadcast(99, numSupplyDepots);
         rc.broadcast(100, numBarracks);
         rc.broadcast(101, numTankFactories);
@@ -252,99 +216,36 @@ public class RobotPlayer {
         if (rc.isWeaponReady()) {
             attackSomething();
         }
+        
         if (rc.isCoreReady()) {
-            if (rc.getTeamOre() >= 500 && rc.readBroadcast(102) < 1) {
+            int numMinerFactory, numBarracks, numTankFactory, numSupplyDepots, armySize, ore;
+            ore = (int) rc.getTeamOre();
+            numMinerFactory = rc.readBroadcast(102);
+            numBarracks = rc.readBroadcast(100);
+            numTankFactory = rc.readBroadcast(101);
+            numSupplyDepots = rc.readBroadcast(99);
+            armySize = rc.readBroadcast(10);
+            rc.setIndicatorString(1, "trying to build");
+            if(ore >= 500 && numMinerFactory < 1){
                 tryBuild(directions[rand.nextInt(8)], RobotType.MINERFACTORY);
-            } else if (rc.getTeamOre() >= 400 && rc.readBroadcast(100) < 2 && rc.readBroadcast(102) > 0) {
+            } else if (ore >= 400 && numMinerFactory >0 && numBarracks <2){ //TODO: adjust to make more if we can't produce units fast enough
                 tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
-            } else if (rc.getTeamOre() >= 100 && rc.readBroadcast(99) < 1 && rc.readBroadcast(102) > 0) {
-                tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
-            } else if (rc.getTeamOre() >= 500 && rc.readBroadcast(100) > 1 && rc.readBroadcast(101) < 1 && rc.readBroadcast(102) > 0) {
+            } else if (ore >= 500 && numBarracks > 1 && numTankFactory < 2 && numMinerFactory >0) {
                 tryBuild(rc.getLocation().directionTo(myHQ), RobotType.TANKFACTORY);
-            } else if (distanceBetween(rc.getLocation(), myHQ) < 4) {
-
-                if (myDirection == null) {
-                    int fate = rand.nextInt(80);
-                    if (fate < 10) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).rotateLeft();
-                    } else if (fate < 20) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).rotateRight();
-                    } else if (fate < 30) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).rotateRight().rotateRight();
-                    } else if (fate < 40) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).rotateLeft().rotateLeft();
-                    } else if (fate < 50) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).rotateLeft().rotateLeft().rotateLeft();
-                    } else if (fate < 60) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).rotateRight().rotateRight().rotateRight();
-                    } else if (fate < 70) {
-                        myDirection = rc.getLocation().directionTo(enemyHQ).opposite();
-                    } else {
-                        myDirection = rc.getLocation().directionTo(enemyHQ);
-                    }
+            } else if (ore >= 100 && numSupplyDepots < 1 && armySize > 50) {
+                tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
+            } else { //move and mine
+                if(rc.getLocation().distanceSquaredTo(myHQ) < 4){
+                    rc.setIndicatorString(1, "trying to move away");
+                    tryMove(rc.getLocation().directionTo(myHQ).opposite(), "");
+                }else if (rc.senseOre(rc.getLocation()) > 4){
+                    rc.setIndicatorString(1, "mining");
+                    rc.mine();
+                }else {
+                    rc.setIndicatorString(1, "trying to move randomly");
+                    tryMove(directions[rand.nextInt(8)], "");
                 }
-                tryMove(myDirection, "");
-            } else if (rc.senseOre(rc.getLocation()) > 5) {
-                rc.mine();
-
-            } else if (distanceBetween(rc.getLocation(), myHQ) < 20) {
-                int fate = rand.nextInt(640);
-                if (fate < 10) {
-                    myDirection = myDirection.rotateLeft();
-                    tryMove(myDirection, "");
-                } else if (fate < 20) {
-                    myDirection = myDirection.rotateRight();
-                    tryMove(myDirection, "");
-                } else if (fate < 30) {
-                    myDirection = myDirection.rotateRight().rotateRight();
-                    tryMove(myDirection, "");
-                } else if (fate < 40) {
-                    myDirection = myDirection.rotateLeft().rotateLeft();
-                    tryMove(myDirection, "");
-                } else if (fate < 50) {
-                    myDirection = myDirection.rotateLeft().rotateLeft().rotateLeft();
-                    tryMove(myDirection, "");
-                } else if (fate < 60) {
-                    myDirection = myDirection.rotateRight().rotateRight().rotateRight();
-                    tryMove(myDirection, "");
-                } else if (fate < 70) {
-                    myDirection = myDirection.opposite();
-                    tryMove(myDirection, "");
-                } else if (fate < 80) {
-
-                    tryMove(myDirection, "");
-                }
-
-            } else if (distanceBetween(rc.getLocation(), myHQ) >= 20) {
-                int fate = rand.nextInt(2);
-                if (fate == 1) {
-                    myDirection = rc.getLocation().directionTo(myHQ);
-                    tryMove(myDirection, "");
-                }
-//                        }else if (rc.senseOre(rc.getLocation()) > 0) {
-//				rc.mine();
-            } else if (rc.senseOre(rc.getLocation()) <= 0) {
-
-                int fate = rand.nextInt(8);
-                int fateInit = fate;
-                boolean looped = false;
-                while ((rc.senseOre(rc.getLocation().add(directions[fate])) == 0 || !rc.canMove(directions[fate])) && !looped) {
-                    fate = (fate + 1) % 8;
-                    if (fate == fateInit) {
-                        looped = true;
-                    }
-
-                }
-                if (!looped) {
-                    tryMove(directions[fate], "");
-                } else {
-                    tryMove(directions[fate], "");
-                }
-
-            } else { //run awwayy!
-                tryMove(rc.getLocation().directionTo(myHQ).opposite(), "");
             }
-            //TODO: search for ore
         }
     }
 
@@ -425,7 +326,6 @@ public class RobotPlayer {
             default: //building probably
                 return 0;
         }
-        
     }
 
     // This method will attempt to move in Direction d (or as close to it as possible)
@@ -549,18 +449,23 @@ public class RobotPlayer {
         }
     }
 
+
     // This method will attempt to build in the given direction (or as close to it as possible)
-    static void tryBuild(Direction d, RobotType type) throws GameActionException {
+    static boolean tryBuild(Direction d, RobotType type) throws GameActionException {
         int offsetIndex = 0;
         int[] offsets = {0, 1, -1, 2, -2, 3, -3, 4};
         int dirint = directionToInt(d);
         boolean blocked = false;
-        while (offsetIndex < 8 && (!rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]) ||
-                (rc.getLocation().add(directions[(dirint + offsets[offsetIndex] + 8) % 8]).x % 2 != rc.getLocation().add(directions[(dirint + offsets[offsetIndex] + 8) % 8]).y % 2))) {
+        while (offsetIndex < 8 && (!rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]) 
+                || !mapLocationIsOnGrid(rc.getLocation().add(directions[(dirint + offsets[offsetIndex] + 8) % 8])))) {
             offsetIndex++;
         }
         if (offsetIndex < 8) {
             rc.build(directions[(dirint + offsets[offsetIndex] + 8) % 8], type);
+            return true;
+        } else {
+            rc.setIndicatorString(1, "could not build");
+            return false;
         }
     }
 
@@ -766,5 +671,9 @@ public class RobotPlayer {
         }
         //assume HQ won't be a problem
         return false;
+    }
+    
+    static boolean mapLocationIsOnGrid(MapLocation loc){
+        return Math.abs(loc.x)%2 == Math.abs(loc.y)%2;
     }
 }
