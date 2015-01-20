@@ -165,6 +165,7 @@ public class RobotPlayer {
         if (rc.isWeaponReady()) {
             attackSomething();
         }
+        dumpSupply();
     }
 
     static void basher() throws GameActionException {
@@ -174,6 +175,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             moveToRally();
         }
+        dumpSupply();
     }
 
     static void soldier() throws GameActionException {
@@ -184,6 +186,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             moveToRally();
         }
+        dumpSupply();
     }
 
     static void tank() throws GameActionException {
@@ -194,6 +197,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             moveToRally();
         }
+        dumpSupply();
     }
 
     static void miner() throws GameActionException {
@@ -219,6 +223,7 @@ public class RobotPlayer {
                 }
             }
         }
+        dumpSupply();
     }
 
     static void beaver() throws GameActionException {
@@ -264,6 +269,7 @@ public class RobotPlayer {
                 }
             }
         }
+        dumpSupply();
     }
 
     static void barracks() throws GameActionException {
@@ -286,6 +292,7 @@ public class RobotPlayer {
 //				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
 //			}
         }
+        dumpSupply();
     }
 
     static void tankFactory() throws GameActionException {
@@ -294,13 +301,68 @@ public class RobotPlayer {
         if ((rc.isCoreReady() && rc.getTeamOre() >= 250) || (rc.isCoreReady() && rc.getTeamOre() > 1000)) {
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.TANK);
         }
+        dumpSupply();
     }
 
     static void minerFactory() throws GameActionException {
         if (rc.isCoreReady() && rc.getTeamOre() >= 50 && rc.readBroadcast(4) < 15) { // TODO make function of map size
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.MINER);
         }
+        dumpSupply();
 
+    }
+
+    static void dumpSupply() throws GameActionException {
+        if (rc.getHealth() <= 5) {
+            RobotInfo nearAllies[] = rc.senseNearbyRobots(15, myTeam);
+            if (nearAllies.length > 0) {
+                switch (rc.getType()) {
+                    case BEAVER:
+                        if (rc.getSupplyLevel() > 50)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 50, nearAllies[0].location);
+                        break;
+                    case MINER:
+                        if (rc.getSupplyLevel() > 40)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 40, nearAllies[0].location);
+                        break;
+                    case COMPUTER:
+                        if (rc.getSupplyLevel() > 10)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 10, nearAllies[0].location);
+                        break;
+                    case BASHER:
+                        if (rc.getSupplyLevel() > 30)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 30, nearAllies[0].location);
+                        break;
+                    case COMMANDER:
+                        if (rc.getSupplyLevel() > 25)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 25, nearAllies[0].location);
+                        break;
+                    case LAUNCHER:
+                        if (rc.getSupplyLevel() > 125)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 125, nearAllies[0].location);
+                        break;
+                    case MISSILE:
+                        rc.transferSupplies((int) rc.getSupplyLevel(), nearAllies[0].location);
+                        break;
+                    case SOLDIER:
+                        if (rc.getSupplyLevel() > 25)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 25, nearAllies[0].location);
+                        break;
+                    case TANK:
+                        if (rc.getSupplyLevel() > 75)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 75, nearAllies[0].location);
+                        break;
+                    case DRONE:
+                        if (rc.getSupplyLevel() > 50)
+                            rc.transferSupplies((int) rc.getSupplyLevel() - 50, nearAllies[0].location);
+                        break;
+                    default: //building probably
+                        rc.transferSupplies((int) rc.getSupplyLevel(), nearAllies[0].location);
+                        break;
+                }
+
+            }
+        }
     }
 
     /**
@@ -328,18 +390,59 @@ public class RobotPlayer {
         }
     }
 
+    static double getDamage(RobotType r) {
+        switch (r) {
+            case BEAVER:
+                return 2;
+            case MINER:
+                return 1.5;
+            case COMPUTER:
+                return 0;
+            case BASHER:
+                return 4;
+            case COMMANDER:
+                return 10;
+            case LAUNCHER:
+                return 0;
+            case MISSILE:
+                return 20; //temp
+            case TOWER:
+                return 10;
+            case SOLDIER:
+                return 4;
+            case TANK:
+                return 6.7;
+            case DRONE:
+                return 2.7;
+            default: //building probably
+                return 0;
+        }
+    }
+
     static int getThreatLevel(RobotType r) {
         switch (r) {
-            case MISSILE:
-                return 5; //temp
-            case TOWER:
-                return 4;
-            case SOLDIER:
-                return 3;
-            case TANK:
+            case BEAVER:
                 return 2;
-            case DRONE:
+            case MINER:
+                return 3;
+            case COMPUTER:
                 return 1;
+            case BASHER:
+                return 6;
+            case COMMANDER:
+                return 9;
+            case LAUNCHER:
+                return 8;
+            case MISSILE:
+                return 11; //temp
+            case TOWER:
+                return 10;
+            case SOLDIER:
+                return 4;
+            case TANK:
+                return 7;
+            case DRONE:
+                return 5;
             default: //building probably
                 return 0;
         }
@@ -619,7 +722,13 @@ public class RobotPlayer {
         for (RobotInfo ri : nearbyAllies) {
             if (ri.supplyLevel < lowestSupply) {
                 lowestSupply = ri.supplyLevel;
-                transferAmount = (rc.getSupplyLevel() - ri.supplyLevel) / 2;
+                if (getThreatLevel(ri.type) != 10 && getThreatLevel(ri.type) != 0) {
+                    if (getThreatLevel(rc.getType()) != 10 && getThreatLevel(rc.getType()) != 0) {
+                        transferAmount = (rc.getSupplyLevel() - ri.supplyLevel) / 2;
+                    } else {
+                        transferAmount = rc.getSupplyLevel();
+                    }
+                }
                 suppliesToThisLocation = ri.location;
             }
         }
