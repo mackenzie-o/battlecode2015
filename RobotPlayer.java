@@ -791,7 +791,13 @@ public class RobotPlayer {
         for (RobotInfo ri : nearbyAllies) {
             if (ri.supplyLevel < lowestSupply) {
                 lowestSupply = ri.supplyLevel;
-                transferAmount = (rc.getSupplyLevel() - ri.supplyLevel) / 2;
+              if (getThreatLevel(ri.type) != 10 && getThreatLevel(ri.type) != 0)  {
+                if (getThreatLevel(rc.getType()) != 10 && getThreatLevel(rc.getType()) != 0){
+                    transferAmount = (rc.getSupplyLevel() - ri.supplyLevel) / 2;
+                } else {
+                    transferAmount = rc.getSupplyLevel();
+                }
+              }
                 suppliesToThisLocation = ri.location;
             }
         }
