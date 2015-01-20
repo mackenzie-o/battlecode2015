@@ -1,5 +1,6 @@
 package team166;
 
+import battlecode.client.viewer.AbstractDrawObject.RobotInfo;
 import battlecode.common.*;
 
 import java.util.*;
@@ -191,6 +192,7 @@ public class RobotPlayer {
         if (rc.isWeaponReady()) {
             attackSomething();
         }
+        dumpSupply();
     }
 
     static void basher() throws GameActionException {
@@ -200,6 +202,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             moveToRally();
         }
+        dumpSupply();
     }
 
     static void soldier() throws GameActionException {
@@ -210,6 +213,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             moveToRally();
         }
+        dumpSupply();
     }
 
     static void tank() throws GameActionException {
@@ -220,6 +224,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             moveToRally();
         }
+        dumpSupply();
     }
 
     static void miner() throws GameActionException {
@@ -245,6 +250,7 @@ public class RobotPlayer {
                 }
             }
         }
+        dumpSupply();
     }
 
     static void beaver() throws GameActionException {
@@ -346,6 +352,7 @@ public class RobotPlayer {
             }
             //TODO: search for ore
         }
+        dumpSupply();
     }
 
     static void barracks() throws GameActionException {
@@ -368,6 +375,7 @@ public class RobotPlayer {
 //				trySpawn(rc.getLocation().directionTo(enemyHQ),RobotType.SOLDIER);
 //			}
         }
+        dumpSupply();
     }
 
     static void tankFactory() throws GameActionException {
@@ -376,13 +384,59 @@ public class RobotPlayer {
         if ((rc.isCoreReady() && rc.getTeamOre() >= 250) || (rc.isCoreReady() && rc.getTeamOre() > 1000)) {
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.TANK);
         }
+        dumpSupply();
     }
 
     static void minerFactory() throws GameActionException {
         if (rc.isCoreReady() && rc.getTeamOre() >= 50 && rc.readBroadcast(4) < 15) { // TODO make function of map size
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.MINER);
         }
+        dumpSupply();
 
+    }
+    static void dumpSupply(){
+        if (rc.getHealth() <= 5){
+            RobotInfo nearAllies[] = senseNearbyRobots(15, myTeam);
+            if(nearAllies[0] != null){
+                switch(nearAllies[0].getType()){
+            case BEAVER:
+                rc.transferSupplies(rc.supplyLevel - 50, nearAllies[0].getLocation());
+                break;
+            case MINER:
+                rc.transferSupplies(rc.supplyLevel - 40, nearAllies[0].getLocation());
+                break;
+            case COMPUTER:
+                rc.transferSupplies(rc.supplyLevel - 10, nearAllies[0].getLocation());
+                break;
+            case BASHER:
+                rc.transferSupplies(rc.supplyLevel - 30, nearAllies[0].getLocation());
+                break;
+            case COMMANDER:
+                rc.transferSupplies(rc.supplyLevel - 25, nearAllies[0].getLocation());
+                break;
+            case LAUNCHER:
+                rc.transferSupplies(rc.supplyLevel - 125, nearAllies[0].getLocation());
+                break;
+            case MISSILE:
+                rc.transferSupplies(rc.supplyLevel, nearAllies[0].getLocation());
+                break;
+            case SOLDIER:
+                rc.transferSupplies(rc.supplyLevel - 25, nearAllies[0].getLocation());
+                break;
+            case TANK:
+                rc.transferSupplies(rc.supplyLevel - 75, nearAllies[0].getLocation());
+                break;
+            case DRONE:
+                rc.transferSupplies(rc.supplyLevel - 50, nearAllies[0].getLocation());
+                break;
+            default: //building probably
+                rc.transferSupplies(rc.supplyLevel, nearAllies[0].getLocation());
+                break;
+        }
+                
+            }
+        }
+        
     }
 
     /**
@@ -409,19 +463,59 @@ public class RobotPlayer {
             rc.attackLocation(target.location);
         }
     }
+    static float getDamage(RobotType r){
+         switch(r){
+            case BEAVER:
+                return 2;
+            case MINER:
+                return 1.5;
+            case COMPUTER:
+                return 0;
+            case BASHER:
+                return 4;
+            case COMMANDER:
+                return 10;
+            case LAUNCHER:
+                return 0;
+            case MISSILE:
+                return 20; //temp
+            case TOWER:
+                return 10;
+            case SOLDIER:
+                return 4;
+            case TANK:
+                return 6.7;
+            case DRONE:
+                return 2.7;
+            default: //building probably
+                return 0;
+        }
+    }
     
     static int getThreatLevel(RobotType r){
         switch(r){
-            case MISSILE:
-                return 5; //temp
-            case TOWER:
-                return 4;
-            case SOLDIER:
-                return 3;
-            case TANK:
+            case BEAVER:
                 return 2;
-            case DRONE:
+            case MINER:
+                return 3;
+            case COMPUTER:
                 return 1;
+            case BASHER:
+                return 6;
+            case COMMANDER:
+                return 9;
+            case LAUNCHER:
+                return 8;
+            case MISSILE:
+                return 11; //temp
+            case TOWER:
+                return 10;
+            case SOLDIER:
+                return 4;
+            case TANK:
+                return 7;
+            case DRONE:
+                return 5;
             default: //building probably
                 return 0;
         }
