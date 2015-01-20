@@ -733,7 +733,11 @@ public class RobotPlayer {
                     if (getThreatLevel(rc.getType()) != 10 && getThreatLevel(rc.getType()) != 0) {
                         transferAmount = (rc.getSupplyLevel() - ri.supplyLevel) / 2;
                     } else {
-                        transferAmount = rc.getSupplyLevel();
+                        if (rc.getSupplyLevel() > 7500){
+                            transferAmount = 7500;
+                        } else{
+                            transferAmount = rc.getSupplyLevel();
+                        }
                     }
                 }
                 suppliesToThisLocation = ri.location;
