@@ -17,6 +17,7 @@ public class RobotPlayer {
     static boolean bug;
     static int howClose;
     static int[][] surrounding;
+    static int minOre;
     static Random rand;
     static RobotInfo[] myRobots;
     static boolean attack;
@@ -40,6 +41,7 @@ public class RobotPlayer {
         bug = false;
         clockwise = false;
         surrounding = new int[3][3];
+        minOre = -1;
 
         rc.setIndicatorString(0, "I am a " + rc.getType());
 
@@ -202,11 +204,16 @@ public class RobotPlayer {
 
     static void miner() throws GameActionException {
         transferSupplies();
+        if(minOre == -1){
+            minOre = (int) rc.senseOre(rc.getLocation());
+            if (minOre < 1) minOre = 1;
+            else if (minOre > 5) minOre = 5;
+        }
         if (rc.isWeaponReady()) {
             attackSomething();
         }
         if (rc.isCoreReady()) {
-            if (rc.canMine() && rc.senseOre(rc.getLocation()) > 5) {
+            if (rc.canMine() && rc.senseOre(rc.getLocation()) > minOre) {
                 rc.setIndicatorString(1, "Mining...");
                 rc.mine();
             } else {
@@ -246,9 +253,9 @@ public class RobotPlayer {
                 rc.setIndicatorString(1, "trying to build");
                 if (ore >= 500 && numMinerFactory < 1) {
                     tryBuild(directions[rand.nextInt(8)], RobotType.MINERFACTORY);
-                } else if (ore >= 400 && numMinerFactory > 0 && (numBarracks < 1 || (numTankFactory > 1 && numBarracks < numTankFactory - 2))) { //TODO: adjust to make more if we can't produce units fast enough
+                } else if (ore >= 400 && numMinerFactory > 0 && (numBarracks < 1 || (numTankFactory > 0 && numBarracks < numTankFactory - 2))) { //TODO: adjust to make more if we can't produce units fast enough
                     tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
-                } else if (ore >= 500 && numBarracks > 0 && numTankFactory < 2 && numMinerFactory > 0) {
+                } else if (ore >= 500 && numBarracks > 0 && (numTankFactory<0 || ore>900) && numMinerFactory > 0) {
                     tryBuild(rc.getLocation().directionTo(myHQ), RobotType.TANKFACTORY);
                 } else if (ore >= 100 && numSupplyDepots < 3 && armySize > 25 + 50 * (numSupplyDepots)) {
                     tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
@@ -259,7 +266,7 @@ public class RobotPlayer {
                     } else if (rc.getLocation().distanceSquaredTo(myHQ) > 16) {
                         rc.setIndicatorString(1, "trying to move to HQ");
                         tryMove(rc.getLocation().directionTo(myHQ), "");
-                    } else if (rc.senseOre(rc.getLocation()) > 4) {
+                    } else if (rc.senseOre(rc.getLocation()) > 1) {
                         rc.setIndicatorString(1, "mining");
                         rc.mine();
                     } else {
@@ -477,7 +484,7 @@ public class RobotPlayer {
 //            else rc.broadcast(60, 2);
 //        }
 
-        if (attack || (distanceToGoal < rc.getLocation().distanceSquaredTo(myHQ) && Clock.getRoundNum() % 250 < 10)) {
+        if (attack || (distanceToGoal < rc.getLocation().distanceSquaredTo(myHQ) && Clock.getRoundNum()> 260 && Clock.getRoundNum() % 250 < 10)) {
             rally = new MapLocation(rc.readBroadcast(50), rc.readBroadcast(51));
             attack = true;
         }
@@ -745,7 +752,7 @@ public class RobotPlayer {
     }
 
     static MapLocation findBestOre() throws GameActionException {
-        MapLocation locs[] = MapLocation.getAllMapLocationsWithinRadiusSq(rc.getLocation(), 4);
+        MapLocation locs[] = MapLocation.getAllMapLocationsWithinRadiusSq(rc.getLocation(), 9);
         MapLocation currentLoc = rc.getLocation();
         MapLocation bestLoc = currentLoc;
         double bestOre = 5;
@@ -760,7 +767,7 @@ public class RobotPlayer {
             }
         }
         //if you are at the broadcasted location and the broadcasted ore amount is outdated, update ore count
-        if (distanceBetween(currentLoc, new MapLocation(rc.readBroadcast(201), rc.readBroadcast(202))) < 25 &&
+        if (distanceBetween(currentLoc, new MapLocation(rc.readBroadcast(201), rc.readBroadcast(202))) < 5 &&
                 (int) bestOre < rc.readBroadcast(200)) {
             rc.broadcast(200, (int) bestOre);
         }
