@@ -503,6 +503,9 @@ public class RobotPlayer {
         String digest = "";
         Direction optimal = rc.getLocation().directionTo(goal);
         Direction closeEnough = dirCloserToRally(howClose, optimal);
+        digest += "goal: " + goal;
+        digest += "close enough: " + closeEnough;
+        digest += "optimal: " + optimal;
         if (rc.canMove(closeEnough) && closeEnough != Direction.NONE) {
             digest += "going straight there:";
             tryMove(closeEnough, digest);
