@@ -205,7 +205,7 @@ public class RobotPlayer {
     static void miner() throws GameActionException {
         transferSupplies();
         if(minOre == -1){
-            minOre = (int) rc.senseOre(rc.getLocation());
+            minOre = (int) rc.senseOre(rc.getLocation())/3;
             if (minOre < 1) minOre = 1;
             else if (minOre > 5) minOre = 5;
         }
@@ -465,11 +465,10 @@ public class RobotPlayer {
             offsetIndex++;
         }
         if (offsetIndex < 5) {
-            if (rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]))
-                rc.setIndicatorString(1, info + " move good:" + directions[(dirint + offsets[offsetIndex] + 8) % 8]);
-            else rc.setIndicatorString(1, info + " move bad:" + directions[(dirint + offsets[offsetIndex] + 8) % 8]);
-            rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
-            //mapMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+            if (rc.canMove(directions[(dirint + offsets[offsetIndex] + 8) % 8])){
+                rc.move(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+                mapMove(directions[(dirint + offsets[offsetIndex] + 8) % 8]);
+            }
             return true;
         } else {
             rc.setIndicatorString(1, info + "move failed");
@@ -487,6 +486,7 @@ public class RobotPlayer {
         if (attack || (distanceToGoal < rc.getLocation().distanceSquaredTo(myHQ) && Clock.getRoundNum()> 260 && Clock.getRoundNum() % 250 < 10)) {
             rally = new MapLocation(rc.readBroadcast(50), rc.readBroadcast(51));
             attack = true;
+            howClose = rally.distanceSquaredTo(rc.getLocation());;
         }
 
         if (distanceToGoal > 4)
@@ -510,6 +510,7 @@ public class RobotPlayer {
         String digest = "";
         Direction optimal = rc.getLocation().directionTo(goal);
         Direction closeEnough = dirCloserToRally(howClose, optimal);
+        //rc.setIndicatorString(2, "dirCloserToRally")
         if (rc.canMove(closeEnough) && closeEnough != Direction.NONE) {
             digest += "going straight there:";
             tryMove(closeEnough, digest);
