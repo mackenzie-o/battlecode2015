@@ -271,7 +271,8 @@ public class RobotPlayer {
         }
         if (rc.isCoreReady()) {
             if (retreat()) {
-                tryMove(rc.getLocation().directionTo(myHQ), "Retreat");
+                bug(findClosestFriendlyTower());//Michael's code
+                //tryMove(rc.getLocation().directionTo(myHQ), "Retreat");
             } else {
                 moveToRally();
             }
@@ -290,7 +291,7 @@ public class RobotPlayer {
         if (rc.isCoreReady()) {
             if (retreat()) {
                 howClose = 10000;
-                bug(myHQ);
+                bug(findClosestFriendlyTower());
                 //TODO: retreat to nearest tower
             } else {
                 moveToRally();
@@ -556,13 +557,13 @@ public class RobotPlayer {
     }
 
     static boolean retreat() {
-//        RobotInfo [] enemyRobots = rc.senseNearbyRobots(SENSE_RANGE, enemyTeam);
-//        if (enemyRobots.length>0){
-//            double us = getArmyThreat(rc.senseNearbyRobots(SENSE_RANGE, myTeam));
-//            double them = getArmyThreat(enemyRobots);
-//            currentForce = us;
-//            return us < them;
-//        }
+        RobotInfo [] enemyRobots = rc.senseNearbyRobots(SENSE_RANGE, enemyTeam);
+        if (enemyRobots.length>0){
+            double us = getArmyThreat(rc.senseNearbyRobots(SENSE_RANGE, myTeam));
+            double them = getArmyThreat(enemyRobots);
+            currentForce = us;
+            return us < them;
+        }
         return false;
     }
 
@@ -744,6 +745,24 @@ public class RobotPlayer {
         MapLocation[] towers = rc.senseEnemyTowerLocations();
         MapLocation closest = enemyHQ;
         int min_distance = rally.distanceSquaredTo(enemyHQ);
+        int cur;
+
+        for (int i = 0; i < towers.length; i++) {
+            cur = rally.distanceSquaredTo(towers[i]);
+            if (cur < min_distance) {
+                closest = towers[i];
+                min_distance = cur;
+            }
+        }
+        return closest;
+
+
+    }
+    
+    static MapLocation findClosestFriendlyTower() {
+        MapLocation[] towers = rc.senseTowerLocations();
+        MapLocation closest = myHQ;
+        int min_distance = rally.distanceSquaredTo(myHQ);
         int cur;
 
         for (int i = 0; i < towers.length; i++) {
