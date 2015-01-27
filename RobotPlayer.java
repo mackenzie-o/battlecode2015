@@ -168,7 +168,7 @@ public class RobotPlayer {
         rc.broadcast(102, numMinerFactories);
         if (rc.readBroadcast(75) == 0) {
             for (int i = 0; i < directions.length; i++) {
-                minOre = (int) rc.senseOre(rc.getLocation().add(directions[i]))/3;
+                minOre = (int) rc.senseOre(rc.getLocation().add(directions[i])) / 3;
                 if (minOre > 0) {
                     break;
                 }
@@ -177,9 +177,9 @@ public class RobotPlayer {
             else if (minOre > 5) minOre = 5;
             rc.broadcast(75, minOre);
         }
-        if(rc.readBroadcast(76) == 0){
-            rc.setIndicatorString(1, "Distance:"+myHQ.distanceSquaredTo(enemyHQ));
-            rc.broadcast(76, (int) Math.sqrt(myHQ.distanceSquaredTo(enemyHQ))/2);
+        if (rc.readBroadcast(76) == 0) {
+            rc.setIndicatorString(1, "Distance:" + myHQ.distanceSquaredTo(enemyHQ));
+            rc.broadcast(76, (int) Math.sqrt(myHQ.distanceSquaredTo(enemyHQ)) / 2);
         }
 
         if (rc.isWeaponReady()) {
@@ -242,7 +242,7 @@ public class RobotPlayer {
                             && rc.senseRobotAtLocation(cur).type == RobotType.TOWER)) {
                         rc.broadcast(i + 2, -1);
                         MapLocation next = findClosestFriendlyTower(cur);
-                        rc.broadcast(getTowerChannel(next), 1000+Clock.getRoundNum());
+                        rc.broadcast(getTowerChannel(next), 1000 + Clock.getRoundNum());
                     }
                 }
                 numTowers = rc.senseTowerLocations().length;
@@ -256,11 +256,11 @@ public class RobotPlayer {
                     broadcastLocation(target);
                     rc.broadcast(53, Clock.getRoundNum());
                 } else {
-                    if((!defense && canWeWin(rally)) || (defense && 0.90*getArmyThreat(rc.senseNearbyRobots(defensiveRally, 25, myTeam))>= getArmyThreat(rc.senseNearbyRobots(rally, 25, enemyTeam)))){
+                    if ((!defense && canWeWin(rally)) || (defense && 0.90 * getArmyThreat(rc.senseNearbyRobots(defensiveRally, 25, myTeam)) >= getArmyThreat(rc.senseNearbyRobots(rally, 25, enemyTeam)))) {
                         broadcastLocation(rally);
                         defense = false;
                         rc.setIndicatorString(1, "Fighting");
-                    }else {//not do go rally to
+                    } else {//not do go rally to
                         rc.setIndicatorString(1, "Defending");
                         broadcastLocation(defensiveRally);
                         defense = true;
@@ -406,11 +406,11 @@ public class RobotPlayer {
                 //rc.setIndicatorString(1, "trying to build");
                 if (ore >= 500 && numMinerFactory < 1) {
                     tryBuild(directions[rand.nextInt(8)], RobotType.MINERFACTORY);
-                } else if (ore >= 400 && numMinerFactory > 0 && (numBarracks < 1 || (numTankFactory > 0 && numBarracks < numTankFactory - 2))) { 
+                } else if (ore >= 400 && numMinerFactory > 0 && (numBarracks < 1 || (numTankFactory > 0 && numBarracks < numTankFactory - 2))) {
                     tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
-                } else if (ore >= 500 && numBarracks > 0 && (numTankFactory < 0 || ore > 900) && numMinerFactory > 0 && numSupplyDepots+2 > numTankFactory) {
+                } else if (ore >= 500 && numBarracks > 0 && (numTankFactory < 0 || ore > 900) && numMinerFactory > 0 && numSupplyDepots + 2 > numTankFactory) {
                     tryBuild(rc.getLocation().directionTo(myHQ), RobotType.TANKFACTORY);
-                } else if (ore >= 100 && numSupplyDepots<numBarracks && numTankFactory>1) {
+                } else if (ore >= 100 && numSupplyDepots < numBarracks && numTankFactory > 1) {
                     tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
                 } else { //move and mine
                     if (rc.getLocation().distanceSquaredTo(myHQ) < 4) {
@@ -605,8 +605,8 @@ public class RobotPlayer {
     }
 
     static boolean retreat() {
-        RobotInfo [] enemyRobots = rc.senseNearbyRobots(SENSE_RANGE, enemyTeam);
-        if (enemyRobots.length>0){
+        RobotInfo[] enemyRobots = rc.senseNearbyRobots(SENSE_RANGE, enemyTeam);
+        if (enemyRobots.length > 0) {
             double us = getArmyThreat(rc.senseNearbyRobots(SENSE_RANGE, myTeam));
             double them = getArmyThreat(enemyRobots);
             currentForce = us;
@@ -646,7 +646,7 @@ public class RobotPlayer {
 //            attack = true;
 //            howClose = rally.distanceSquaredTo(rc.getLocation());
 //        }
-        
+
 
         if (distanceToGoal > 4)
             bug(rally);
@@ -785,9 +785,10 @@ public class RobotPlayer {
                 (enemyHQ.y + myHQ.y) / 2);
 
     }
-    static MapLocation getDefensiveRally(){
-        return new MapLocation((enemyHQ.x + myHQ.x*3) / 4,
-                (enemyHQ.y + myHQ.y*3) / 4);
+
+    static MapLocation getDefensiveRally() {
+        return new MapLocation((enemyHQ.x + myHQ.x * 3) / 4,
+                (enemyHQ.y + myHQ.y * 3) / 4);
     }
 
     static MapLocation findClosestEnemyTower() {
@@ -807,7 +808,7 @@ public class RobotPlayer {
 
 
     }
-    
+
     static MapLocation findClosestFriendlyTower(MapLocation loc) {
         MapLocation[] towers = rc.senseTowerLocations();
         MapLocation closest = myHQ;
@@ -1087,7 +1088,7 @@ public class RobotPlayer {
     }
 
     static int getTowerChannel(MapLocation loc) throws GameActionException {
-        if(loc == myHQ){
+        if (loc == myHQ) {
             return 300;
         }
         for (int i = 301; i <= 316; i += 3) {
@@ -1125,16 +1126,16 @@ public class RobotPlayer {
         }
 
     }
-    
-    static void broadcastDistress() throws GameActionException{
-        if(rc.readBroadcast(statusChannel)>1000){
-            if(rc.readBroadcast(statusChannel)-1000>200 || surroundingEnemyForce>minimunForce){
+
+    static void broadcastDistress() throws GameActionException {
+        if (rc.readBroadcast(statusChannel) > 1000) {
+            if (rc.readBroadcast(statusChannel) - 1000 > 200 || surroundingEnemyForce > minimunForce) {
                 rc.broadcast(statusChannel, (int) surroundingEnemyForce);
             }
-        }else{
+        } else {
             rc.broadcast(statusChannel, (int) surroundingEnemyForce);
         }
-        
+
     }
 }
 
