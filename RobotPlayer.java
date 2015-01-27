@@ -11,6 +11,8 @@ public class RobotPlayer {
     static MapLocation enemyHQ;
     static Team enemyTeam;
     static MapLocation rally;
+    static MapLocation defensiveRally;
+    static boolean defense;
     static int myRange;
     static int SENSE_RANGE = 40;
     static double LOW_HEALTH = 0.20;
@@ -27,10 +29,12 @@ public class RobotPlayer {
     static boolean attack;
     static int lastMessage;
     static int minimunThreat = 10;
-    static int minimunForce = 25;
+    static int minimunForce = 40;
     static int statusChannel;
-    static int surroundingEnemyForce;
+    static double surroundingEnemyForce;
     static MapLocation target;
+    static boolean retreatAndHold = false;
+    static int maxMiners = 25;
 
     static Direction[] directions = {Direction.NORTH, Direction.NORTH_EAST, Direction.EAST,
             Direction.SOUTH_EAST, Direction.SOUTH, Direction.SOUTH_WEST,
@@ -48,8 +52,10 @@ public class RobotPlayer {
         myHQ = rc.senseHQLocation();
         enemyHQ = rc.senseEnemyHQLocation();
         rally = getRally();
+        defensiveRally = getDefensiveRally();
         howClose = 100000;
         bug = false;
+        defense = false;
         clockwise = false;
         surrounding = new int[3][3];
         minOre = -1;
@@ -110,6 +116,7 @@ public class RobotPlayer {
      * ******Robot Type Methods********
      */
     static void hq() throws GameActionException {
+        statusChannel = 300;
         myRobots = rc.senseNearbyRobots(999999, myTeam);
         int numSoldiers = 0;
         int numBashers = 0;
@@ -161,7 +168,7 @@ public class RobotPlayer {
         rc.broadcast(102, numMinerFactories);
         if (rc.readBroadcast(75) == 0) {
             for (int i = 0; i < directions.length; i++) {
-                minOre = rc.senseOre(rc.getLocation().add(directions[i]));
+                minOre = (int) rc.senseOre(rc.getLocation().add(directions[i]))/3;
                 if (minOre > 0) {
                     break;
                 }
@@ -170,11 +177,15 @@ public class RobotPlayer {
             else if (minOre > 5) minOre = 5;
             rc.broadcast(75, minOre);
         }
+        if(rc.readBroadcast(76) == 0){
+            rc.setIndicatorString(1, "Distance:"+myHQ.distanceSquaredTo(enemyHQ));
+            rc.broadcast(76, (int) Math.sqrt(myHQ.distanceSquaredTo(enemyHQ))/2);
+        }
 
         if (rc.isWeaponReady()) {
             towerAttack();
         }
-        rc.broadcast(300, surroundingEnemyForce);
+        broadcastDistress();
 
         if (rc.isCoreReady() && rc.getTeamOre() >= 100 && numBeavers < 2) {
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.BEAVER);
@@ -198,7 +209,7 @@ public class RobotPlayer {
             //315 - Tower 5 status
             //316 & 317 - Tower 6 location (Furthest from HQ)
             //318 - Tower 6 status
-            rc.setIndicatorString(1, "Assigning Channels");
+            //rc.setIndicatorString(1, "Assigning Channels");
             MapLocation[] towers = rc.senseTowerLocations();
             numTowers = towers.length;
             int closest;
@@ -230,21 +241,31 @@ public class RobotPlayer {
                     if (!(rc.canSenseLocation(cur) && rc.senseRobotAtLocation(cur) != null
                             && rc.senseRobotAtLocation(cur).type == RobotType.TOWER)) {
                         rc.broadcast(i + 2, -1);
+                        MapLocation next = findClosestFriendlyTower(cur);
+                        rc.broadcast(getTowerChannel(next), 1000+Clock.getRoundNum());
                     }
                 }
                 numTowers = rc.senseTowerLocations().length;
             } else {
                 MapLocation distress = checkStatuses();
                 if (distress != enemyHQ) {
-                    rc.setIndicatorString(1, "Distress found at: " + distress + " @ " + Clock.getRoundNum());
+                    //rc.setIndicatorString(1, "Distress found at: " + distress + " @ " + Clock.getRoundNum());
                     broadcastLocation(distress);
                 } else if (getArmyThreat(rc.senseNearbyRobots(rally, 20, myTeam)) > minimunForce) {
                     target = findClosestEnemyTower();
                     broadcastLocation(target);
                     rc.broadcast(53, Clock.getRoundNum());
                 } else {
-                    rc.setIndicatorString(1, "Sending to rally @ " + Clock.getRoundNum());
-                    broadcastLocation(rally);
+                    if((!defense && canWeWin(rally)) || (defense && 0.90*getArmyThreat(rc.senseNearbyRobots(defensiveRally, 25, myTeam))>= getArmyThreat(rc.senseNearbyRobots(rally, 25, enemyTeam)))){
+                        broadcastLocation(rally);
+                        defense = false;
+                        rc.setIndicatorString(1, "Fighting");
+                    }else {//not do go rally to
+                        rc.setIndicatorString(1, "Defending");
+                        broadcastLocation(defensiveRally);
+                        defense = true;
+                    }
+
                 }
             }
 
@@ -260,7 +281,7 @@ public class RobotPlayer {
             towerAttack();
         }
         shareSupplies();
-        rc.broadcast(statusChannel, surroundingEnemyForce);
+        broadcastDistress();
     }
 
     static void basher() throws GameActionException {
@@ -280,13 +301,22 @@ public class RobotPlayer {
         if (rc.isWeaponReady()) {
             attackSomething();
         }
-        if (rc.isCoreReady()) {
-            if (retreat()) {
-                bug(findClosestFriendlyTower());//Michael's code
-                //tryMove(rc.getLocation().directionTo(myHQ), "Retreat");
-            } else {
-                moveToRally();
+        MapLocation broadcasted = getBroadcastedRally();
+        if (rally != broadcasted && !(attack && rc.readBroadcast(53) == lastMessage)) {
+            rally = broadcasted;
+            //rc.setIndicatorString(1, "53: "+ rc.readBroadcast(53));
+            if (Clock.getRoundNum() < rc.readBroadcast(53) + 4) {
+                attack = true;
+                lastMessage = rc.readBroadcast(53);
+                //rc.setIndicatorString(2, "attacking " +rally+" "+Clock.getRoundNum());
+            } else if (rc.readBroadcast(53) == 0) {
+                attack = false;
+                //rc.setIndicatorString(2, "Not attacking");
             }
+            howClose = rally.distanceSquaredTo(rc.getLocation());
+        }
+        if (rc.isCoreReady()) {
+            moveToRally();
         }
         if (rc.getHealth() <= rc.getType().maxHealth * LOW_HEALTH) {
             dumpSupply();
@@ -299,14 +329,22 @@ public class RobotPlayer {
         if (rc.isWeaponReady()) {
             attackSomething();
         }
-        if (rc.isCoreReady()) {
-            if (retreat()) {
-                howClose = 10000;
-                bug(findClosestFriendlyTower());
-                //TODO: retreat to nearest tower
-            } else {
-                moveToRally();
+        MapLocation broadcasted = getBroadcastedRally();
+        if (rally != broadcasted && !(attack && rc.readBroadcast(53) == lastMessage)) {
+            rally = broadcasted;
+            //rc.setIndicatorString(1, "53: "+ rc.readBroadcast(53));
+            if (Clock.getRoundNum() < rc.readBroadcast(53) + 4) {
+                attack = true;
+                lastMessage = rc.readBroadcast(53);
+                //rc.setIndicatorString(2, "attacking " +rally+" "+Clock.getRoundNum());
+            } else if (rc.readBroadcast(53) == 0) {
+                attack = false;
+                //rc.setIndicatorString(2, "Not attacking");
             }
+            howClose = rally.distanceSquaredTo(rc.getLocation());
+        }
+        if (rc.isCoreReady()) {
+            moveToRally();
         }
         if (rc.getHealth() <= rc.getType().maxHealth * LOW_HEALTH) {
             dumpSupply();
@@ -327,18 +365,18 @@ public class RobotPlayer {
             if (enemies.length > 0 && getArmyThreat(enemies) > 5) {
                 tryMove(rc.getLocation().directionTo(enemies[0].location).opposite(), "Run away");
             } else if (rc.canMine() && rc.senseOre(rc.getLocation()) > minOre) {
-                rc.setIndicatorString(1, "Mining...");
+                //rc.setIndicatorString(1, "Mining...");
                 rc.mine();
             } else {
                 MapLocation goal = findBestOre();
                 if (goal != rc.getLocation()) {
-                    rc.setIndicatorString(1, "Moving to sensed square");
+                    //rc.setIndicatorString(1, "Moving to sensed square");
                     bug(goal);
                 } else if (rc.readBroadcast(200) >= minOre && rc.readBroadcast(201) != 0 && rc.readBroadcast(202) != 0) {
-                    rc.setIndicatorString(1, "Moving to broadcasted square: " + rc.readBroadcast(201) + " " + rc.readBroadcast(202));
+                    //rc.setIndicatorString(1, "Moving to broadcasted square: " + rc.readBroadcast(201) + " " + rc.readBroadcast(202));
                     bug(new MapLocation(rc.readBroadcast(201), rc.readBroadcast(202)));
                 } else {
-                    rc.setIndicatorString(1, "Moving in random direction");
+                    //rc.setIndicatorString(1, "Moving in random direction");
                 }
             }
         }
@@ -365,27 +403,27 @@ public class RobotPlayer {
                 numTankFactory = rc.readBroadcast(101);
                 numSupplyDepots = rc.readBroadcast(99);
                 armySize = rc.readBroadcast(10);
-                rc.setIndicatorString(1, "trying to build");
+                //rc.setIndicatorString(1, "trying to build");
                 if (ore >= 500 && numMinerFactory < 1) {
                     tryBuild(directions[rand.nextInt(8)], RobotType.MINERFACTORY);
-                } else if (ore >= 400 && numMinerFactory > 0 && (numBarracks < 1 || (numTankFactory > 0 && numBarracks < numTankFactory - 2))) { //TODO: adjust to make more if we can't produce units fast enough
+                } else if (ore >= 400 && numMinerFactory > 0 && (numBarracks < 1 || (numTankFactory > 0 && numBarracks < numTankFactory - 2))) { 
                     tryBuild(directions[rand.nextInt(8)], RobotType.BARRACKS);
-                } else if (ore >= 500 && numBarracks > 0 && (numTankFactory < 0 || ore > 900) && numMinerFactory > 0) {
+                } else if (ore >= 500 && numBarracks > 0 && (numTankFactory < 0 || ore > 900) && numMinerFactory > 0 && numSupplyDepots+2 > numTankFactory) {
                     tryBuild(rc.getLocation().directionTo(myHQ), RobotType.TANKFACTORY);
-                } else if (ore >= 100 && numSupplyDepots < 3 && armySize > 25 + 50 * (numSupplyDepots)) {
+                } else if (ore >= 100 && numSupplyDepots<numBarracks && numTankFactory>1) {
                     tryBuild(rc.getLocation().directionTo(myHQ), RobotType.SUPPLYDEPOT);
                 } else { //move and mine
                     if (rc.getLocation().distanceSquaredTo(myHQ) < 4) {
-                        rc.setIndicatorString(1, "trying to move away");
+                        //rc.setIndicatorString(1, "trying to move away");
                         tryMove(rc.getLocation().directionTo(myHQ).opposite(), "");
                     } else if (rc.getLocation().distanceSquaredTo(myHQ) > 16) {
-                        rc.setIndicatorString(1, "trying to move to HQ");
+                        //rc.setIndicatorString(1, "trying to move to HQ");
                         tryMove(rc.getLocation().directionTo(myHQ), "");
                     } else if (rc.senseOre(rc.getLocation()) > 1) {
-                        rc.setIndicatorString(1, "mining");
+                        //rc.setIndicatorString(1, "mining");
                         rc.mine();
                     } else {
-                        rc.setIndicatorString(1, "trying to move randomly");
+                        //rc.setIndicatorString(1, "trying to move randomly");
                         tryMove(directions[rand.nextInt(8)], "");
                     }
                 }
@@ -425,9 +463,10 @@ public class RobotPlayer {
     }
 
     static void minerFactory() throws GameActionException {
-        if (rc.isCoreReady() && rc.getTeamOre() >= 50 && rc.readBroadcast(4) < 25) { // TODO make function of map size
+        if (rc.isCoreReady() && rc.getTeamOre() >= 50 && rc.readBroadcast(4) < rc.readBroadcast(76)) { // TODO make function of map size
             trySpawn(rc.getLocation().directionTo(enemyHQ), RobotType.MINER);
         }
+        //rc.setIndicatorString(1, "Max: "+rc.readBroadcast(76));
         shareSupplies();
     }
 
@@ -461,7 +500,7 @@ public class RobotPlayer {
             if (rc.getLocation().distanceSquaredTo(target.location) <= myRange) {
                 rc.attackLocation(target.location);
             }
-            surroundingEnemyForce = (int) force;
+            surroundingEnemyForce = force;
         } else {
             surroundingEnemyForce = 0;
         }
@@ -571,6 +610,7 @@ public class RobotPlayer {
             double us = getArmyThreat(rc.senseNearbyRobots(SENSE_RANGE, myTeam));
             double them = getArmyThreat(enemyRobots);
             currentForce = us;
+            surroundingEnemyForce = them;
             return us < them;
         }
         return false;
@@ -606,17 +646,7 @@ public class RobotPlayer {
 //            attack = true;
 //            howClose = rally.distanceSquaredTo(rc.getLocation());
 //        }
-        MapLocation broadcasted = getBroadcastedRally();
-        if (rally != broadcasted && !(attack && rc.readBroadcast(53) == lastMessage)) {
-            rally = broadcasted;
-            if (Clock.getRoundNum() < rc.readBroadcast(53) + 4) {
-                attack = true;
-                lastMessage = rc.readBroadcast(53);
-            } else if (rc.readBroadcast(53) == 0) {
-                attack = false;
-            }
-            howClose = rally.distanceSquaredTo(rc.getLocation());
-        }
+        
 
         if (distanceToGoal > 4)
             bug(rally);
@@ -755,6 +785,10 @@ public class RobotPlayer {
                 (enemyHQ.y + myHQ.y) / 2);
 
     }
+    static MapLocation getDefensiveRally(){
+        return new MapLocation((enemyHQ.x + myHQ.x*3) / 4,
+                (enemyHQ.y + myHQ.y*3) / 4);
+    }
 
     static MapLocation findClosestEnemyTower() {
         MapLocation[] towers = rc.senseEnemyTowerLocations();
@@ -774,14 +808,14 @@ public class RobotPlayer {
 
     }
     
-    static MapLocation findClosestFriendlyTower() {
+    static MapLocation findClosestFriendlyTower(MapLocation loc) {
         MapLocation[] towers = rc.senseTowerLocations();
         MapLocation closest = myHQ;
-        int min_distance = rally.distanceSquaredTo(myHQ);
+        int min_distance = loc.distanceSquaredTo(myHQ);
         int cur;
 
         for (int i = 0; i < towers.length; i++) {
-            cur = rally.distanceSquaredTo(towers[i]);
+            cur = loc.distanceSquaredTo(towers[i]);
             if (cur < min_distance) {
                 closest = towers[i];
                 min_distance = cur;
@@ -1053,6 +1087,9 @@ public class RobotPlayer {
     }
 
     static int getTowerChannel(MapLocation loc) throws GameActionException {
+        if(loc == myHQ){
+            return 300;
+        }
         for (int i = 301; i <= 316; i += 3) {
             if (rc.readBroadcast(i) == loc.x && rc.readBroadcast(i + 1) == loc.y) {
                 return i + 2;
@@ -1087,6 +1124,17 @@ public class RobotPlayer {
             return new MapLocation(broadcasted[0], broadcasted[1]);
         }
 
+    }
+    
+    static void broadcastDistress() throws GameActionException{
+        if(rc.readBroadcast(statusChannel)>1000){
+            if(rc.readBroadcast(statusChannel)-1000>200 || surroundingEnemyForce>minimunForce){
+                rc.broadcast(statusChannel, (int) surroundingEnemyForce);
+            }
+        }else{
+            rc.broadcast(statusChannel, (int) surroundingEnemyForce);
+        }
+        
     }
 }
 
