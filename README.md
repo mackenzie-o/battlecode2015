@@ -1,6 +1,44 @@
-#deus ex machina
-####by MacKenzie O'Bleness & Michael Dunham
-A bot for [MIT's battlecode competition](http://www.battlecode.org/).
+#deus ex machina: a postmortem
+## The Team:
+- MacKenzie O'Bleness: Montana State University (mining, army coordination, pathfinding)
+- Michael Dunham: Montana State University (combat, micro, prodution and supply)
 
+## The Compeition:
+[Battlecode](http://www.battlecode.org/) is an MIT AI compeition. In Battlecode 2015, the objective is to gather resources, build buildings and troops, and destroy the enemy’s HQ. Each HQ is protected by towers. The towers will attack nearby enemies and make your own HQ more powerful while they are alive. In order to attack these towers and ultimately destroy the enemy HQ, we need some troops, and to make troops we need ore. Ore can be gathered by the all purpose beaver unit or the miner unit. Beavers can also make structures like barracks, helipads, and the sanitary hand wash stations.  The main military units are soldiers, bashers, tanks, drones, launchers, and the commander. The soldier is the basic military unit. They are very cheap to build and are often used to overwhelm the enemy with their numbers. Bashers are a larger, tougher soldier with a hammer. The bashers can deal damage in an area adjacent to themselves. Tanks are powerful and efficiently costed units. They have a lot of health and can dish out some serious damage. Drones are light and fast. With the ability to fly, they can easily traverse the map and harass the enemy or destroy their miners. Launchers have the ability to launch missiles. Missiles can fly and explode, dealing damage to anything nearby. The commander is a unique unit. It gains experience by being near enemies as they die and has several abilities that buff allied units and damage enemies. [Click here for a less brief overview of the 2015 spec.](https://github.com/battlecode/battlecode-server/blob/2015-1.2.3/specs.md)
 
-The specific bots (and a rough description of their capabilities/strategy) used for each tournement can be found under releases.
+## Dominant Strategies:
+The Battlecode 2015 tournament saw three dominant strategies. The first of these was a rush strategy, which focused on overwhelming the enemy before they have a chance to get on their feet. The rush strategy often used an initial wave of soldiers followed by a lot of drones. Drones were particularly good at this job because of their cheap cost and high mobility. Often, the rush strategies would attack the opponents miners and beavers. By cutting off the enemy’s supplies, the enemy could no longer build new units or structures. This lead to drones being debuffed after the sprint tournament. 
+
+The second dominant strategy was to amass launchers. This proved to be very effective. By having so many launchers constantly sending a barrage of missiles, the enemy was either stuck in place trying to shoot down all the missiles or wiped out by the raw firepower of the attack. However, because launchers require a certain amount of overhead before they can be built, this strategy was vulnerable to rush attacks. In order to achieve victory a critical mass of launchers was required so that a constant stream of missiles could be fired at the enemy.
+
+The third strategy was the one implemented by our team. It involved amassing soldiers early to protect against an early rush and then filling out the army with plenty of tanks. The soldiers are useful for early game offense and defense. The tanks form the backbone of the army. With their high health and massive firepower, tanks shred through enemy towers and efficiently push through enemy troops. This strategy proved very effective against rush attacks, as the initial soldiers could fight off the first wave of the rush, and the tanks were simply better units than the masses of drones or bashers usually built by rush strategies. This strategy could do well against launcher strategies as long as our army got ahead early and pushed the base. If the opponent built too many launchers too quickly they quickly obliterated our soldiers and tanks.
+
+## Our ~~Dominant~~ Strategy:
+Our particular flavor of this last strategy was built on centralized decision making and rally points. Our individual military robots do very little thinking on their own- they only update their rally point from the HQ’s broadcast, attack, share supply, and do some very buggy bug pathfinding. The HQ evaluates what battles are worth fighting and coordinates the movement of the army through its broadcasted rally point. 
+
+There are two non-aggressive rally points - a normal staging zone halfway between our HQ and the enemy HQ, and a defensive staging zone. The HQ will send robots to the normal staging zone, unless there is already a bigger enemy army there or a friendly tower is under attack. If there is a bigger army at our normal staging zone, the HQ sends units to a defensive staging zone, which is ¼ of the way between our HQ and the enemy HQ. (This prevents our units from streaming one at a time into enemy units that might be chilling in the center of the map).
+
+Each turn, towers broadcast a distress signal if they more than 10 points of threat (evaluated in getDamage())- the HQ will instruct units to defend the closest tower to it until that tower dies or broadcasts an all clear signal. The HQ counts as a tower for the purpose of defense and is the highest priority distress signal.
+
+If we have a force of 60 or greater of threat at our normal staging area and we are not currently winning, the HQ will broadcast an attack signal and the the location of the closest enemy tower or HQ. Any unit within range of the staging area will then attack that tower/HQ until the building is destroyed (at which point it will return to the staging area to meet with reinforcements and resupply until the attack broadcast is received again) or until the unit is killed (at which point it goes to the robot graveyard in the sky). The system of attacking the closest tower, then returning to the rally point, has the benefit of maintaining control of the center of the map. Because our tracking of enemies is naive in that we don’t keep track of them unless a robot can see them at the time, our army constantly crisscrossing most maps means that they are less likely to sneak around our towers, and that our army stays well supplied for the most part without the use of supply drones or soldiers.
+
+A good demonstration of our strategy can be seen in [the second round of this match in the qualifying tournament](http://www.battlecode.org/tournaments/watch/Qualifying/112):
+- Round 200: Team 106 beats us to the center of the map; our units start to gather at the defensive staging area.
+- Round 400: Enemy units get close enough to our tower to briefly trigger a distress signal, which causes our troops to circle the tower.
+- Round 520: After some cautious fighting, we get enough tanks to destroy their units and move forward to the normal staging area
+- Round 600: The attack signal is triggered, units at the staging area move to destroy a tower
+- Round 700: The remaining units return to the staging area
+- Round 980: The units move to attack another tower, then return.
+- Round 1100: After returning to the staging area, they move on a third tower. All die. RIP
+- Round 1300: A second wave takes down the third tower.
+- Round 1500: After this point we lose our mass of tanks. Luckily, we have done enough damage, and their army does not have the time to take down enough of our towers.
+
+For a view on how this strategy developed, you can see a the specific bots (and a rough description of their capabilities/strategy) used for each tournement can be found under releases.
+
+## The Bad Times
+With both of our team members being Battlecode noobs, there were definitely a lot of things that could’ve gone better. Here’s our top 4:
+
+1. Pathfinding. Pathfinding was our number one issue. Our bug implementation lived up to the name, and although it got better over the course of the tournament, there isn’t a match we played that didn’t see a few robots get hopelessly stuck. A few games saw all or almost all of our robots participating in the ‘conga line of death’ where they would loop an obstacle in single file, forever. Sometimes this was inadvertently helpful, as massive groups of our units would prevent enemies from moving through that area (our unexpected success with the seeding bracket is mostly thanks to this fact), but as the tournament went on it became less so.
+2. Micro, or our lack thereof. Beyond attacking higher threat targets first, we have no micro to speak of. This really hurt us against the launcher strategy in the qualifying tournament, when our army would get surrounded by enemies as we desperately tried to shoot all of the missiles down before attacking any launchers. We even could have beaten some of the better tank-based armies, but we were out-mircoed in combat fairly consistently.
+3. Inconsistent scrimmaging. We really only scrimmaged on the nights before and days of the tournaments. This put us at a huge disadvantage, because we never really had time to adjust to the dominant strategy before we went up against it. It would have been much more helpful to keep better track of our opponents.
+4. Starting late. We would have been much better off (and had a much better framework to work off of) if we had started in earnest earlier, rather than later. The first week of the compeition this year was during Montana State’s winter break, which would’ve been a much better time to start than after classes had begun.
